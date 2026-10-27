@@ -1,0 +1,11 @@
+* text=auto eol=lf
+
+*.tif binary
+*.tiff binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.kmz binary
+*.zip binary
+*.gpkg binary
+*.pmtiles binary

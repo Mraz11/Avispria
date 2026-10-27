@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+title: "Avispria"
+type: software
+version: 0.0.1
+license: AGPL-3.0-or-later
+repository-code: "https://github.com/REPLACE_ME/avispria"
+authors:
+  - family-names: "REPLACE_ME"
+    given-names: "REPLACE_ME"
+abstract: >-
+  Offline-first mission planning, capture QA and processing orchestration
+  for consumer RGB drone surveys in forestry and environmental research.
+keywords:
+  - drone
+  - photogrammetry
+  - forestry
+  - remote sensing

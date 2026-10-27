@@ -1,0 +1,79 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "avispria"
+dynamic = ["version"]
+description = "Offline-first mission planning, capture QA and processing orchestration for consumer RGB drone surveys."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "Avispria contributors" }]
+keywords = ["drone", "photogrammetry", "forestry", "WPML", "DJI Fly", "remote sensing"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: GIS",
+]
+dependencies = [
+  "shapely>=2.0",
+  "pyproj>=3.6",
+  # <1.5: rasterio 1.5 macOS wheels require macOS 15+. Revisit (see HANDOFF.md).
+  "rasterio>=1.4.3,<1.5",
+  "lxml>=5.0",
+  "typer>=0.12",
+  "nicegui>=2.0",
+]
+
+[project.scripts]
+avispria = "avispria.app.cli:app"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0",
+  "hypothesis>=6.100",
+  "pytest-cov>=5.0",
+  "ruff>=0.6",
+  "mypy>=1.10",
+  "pre-commit>=3.7",
+]
+
+[tool.hatch.version]
+path = "src/avispria/core/version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/avispria"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
+
+[tool.ruff.format]
+line-ending = "lf"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+files = ["src/avispria/core"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config --cov=avispria --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["avispria"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+exclude_also = ["if __name__ == .__main__.:"]

@@ -1,0 +1,40 @@
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+
+# Rasters and large geodata (keep tiny test fixtures via explicit exceptions)
+*.tif
+*.tiff
+*.vrt
+*.jp2
+*.img
+*.pmtiles
+*.mbtiles
+!tests/fixtures/**/*.tif
+!tests/fixtures/**/*.tiff
+
+# Local work areas and secrets
+/out/
+/work/
+/cache/
+.env
+.env.*
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

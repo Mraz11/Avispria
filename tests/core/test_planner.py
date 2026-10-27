@@ -130,3 +130,12 @@ def test_splits_into_sorties_under_waypoint_limit() -> None:
 def test_bad_gimbal_pitch_rejected() -> None:
     with pytest.raises(PlanningError):
         plan(request(flat_terrain=True, gimbal_pitch_deg=10.0))
+
+
+def test_strip_ends_stop_and_mid_points_pass() -> None:
+    res = plan(request(flat_terrain=True))
+    m = res.missions[0]
+    assert m.waypoints[0].stop and m.waypoints[-1].stop
+    stops = sum(w.stop for w in m.waypoints)
+    assert stops == 2 * res.summary.strips
+    assert any(not w.stop for w in m.waypoints)

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 from numpy.typing import NDArray
@@ -174,7 +174,9 @@ def _plan(req: PlanRequest) -> PlanResult:
     speed = solve_speed(
         cam, ground_sample, req.shutter_s, sp.photo_m, req.drone_max_speed_ms, wind_ms=req.wind_ms
     )
-    if not speed.feasible:
+    # DJI Fly works in 0.1 m/s steps; round down (slower is the safe direction)
+    speed = replace(speed, speed_ms=math.floor(speed.speed_ms * 10 + 1e-9) / 10)
+    if not speed.feasible or speed.speed_ms < 1.0:
         raise PlanningError(
             f"no usable speed: '{speed.binding}' limits the drone to "
             f"{speed.speed_ms:.2f} m/s; use a faster shutter, more height or less overlap"
@@ -183,14 +185,18 @@ def _plan(req: PlanRequest) -> PlanResult:
     path: list[tuple[float, float]] = []
     photo_flags: list[bool] = []
     strip_of_vertex: list[int] = []
+    strip_end_vertices: list[int] = []
     for k, strip in enumerate(strips):
-        for x, y, photo in _strip_vertices(strip, sp.photo_m, overrun, req.photo_mode):
+        verts = _strip_vertices(strip, sp.photo_m, overrun, req.photo_mode)
+        strip_end_vertices += [len(path), len(path) + len(verts) - 1]
+        for x, y, photo in verts:
             path.append((x, y))
             photo_flags.append(photo)
             strip_of_vertex.append(k)
 
     lons, lats, vertex_idx, prof = _profile(req, frame, path, agl)
     photo_at = {vertex_idx[j]: f for j, f in enumerate(photo_flags) if f}
+    stop_at = {vertex_idx[j] for j in strip_end_vertices}
     strip_end = {}
     for j, k in enumerate(strip_of_vertex):
         strip_end[k] = vertex_idx[j]
@@ -216,6 +222,7 @@ def _plan(req: PlanRequest) -> PlanResult:
                 height_above_ground_m=None
                 if prof.above_ground_m is None
                 else float(prof.above_ground_m[j]),
+                stop=s in stop_at,
             )
         )
         ids.append(strip_id(s))

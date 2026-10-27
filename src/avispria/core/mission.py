@@ -41,6 +41,7 @@ class Waypoint:
     take_photo: bool
     surface_clearance_m: float | None
     height_above_ground_m: float | None
+    stop: bool = False  # stop at this waypoint (strip ends) instead of passing through
 
 
 @dataclass(frozen=True)

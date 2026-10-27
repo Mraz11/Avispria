@@ -1,0 +1,19 @@
+# Provenance of lito_x1_5wp.kmz
+source = "DJI Fly waypoint mission created by the founder (map-tapped, not flown)"
+aircraft = "DJI Lito X1"
+controller = "DJI RC-N3"
+phone = "Xiaomi Redmi K90 (Android)"
+dji_fly_version = "unknown"   # fill in from DJI Fly > Profile > Settings > About
+captured = "2026-10-27"
+modifications = "coordinates shifted to Greenwich for privacy; geometry and all other bytes unchanged"
+observed = [
+  "namespace http://www.uav.com/wpmz/1.0.2",
+  "droneEnumValue 68, droneSubEnumValue 0",
+  "template.kml has missionConfig only (no Folder/Placemark)",
+  "executeHeightMode relativeToStartPoint",
+  "first/last turn toPointAndStopWithContinuityCurvature, middle toPointAndPassWithContinuityCurvature",
+  "useStraightLine 0",
+  "gimbalRotate at waypoint 0 (group 1), gimbalEvenlyRotate per segment (group 2 reused)",
+  "no takePhoto action present",
+  "zip entries dated 1980-00-00 00:00",
+]

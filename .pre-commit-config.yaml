@@ -1,4 +1,4 @@
-exclude: ^(LICENSE|uv\.lock)$
+exclude: ^(LICENSE|uv\.lock|tests/fixtures/dji_fly_dummy/.*)$
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

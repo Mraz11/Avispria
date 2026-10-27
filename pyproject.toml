@@ -19,7 +19,9 @@ classifiers = [
   "Topic :: Scientific/Engineering :: GIS",
 ]
 dependencies = [
-  "numpy>=1.26",
+  # <2.5: rasterio 1.4 read() relies on array-shape assignment, deprecated in NumPy 2.5.
+  # Lift together with the rasterio cap once rasterio supports NumPy 2.5+.
+  "numpy>=1.26,<2.5",
   "shapely>=2.0",
   "pyproj>=3.6",
   # <1.5: rasterio 1.5 macOS wheels require macOS 15+. Revisit (see HANDOFF.md).
@@ -70,6 +72,11 @@ files = ["src/avispria/core"]
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
+filterwarnings = [
+  "error",
+  # affine (used by rasterio) announces a future operator change; not our code
+  "ignore:Use `@` matmul instead of `\\*` mul operator:PendingDeprecationWarning",
+]
 addopts = "-ra --import-mode=importlib --strict-markers --strict-config --cov=avispria --cov-report=term-missing"
 
 [tool.coverage.run]

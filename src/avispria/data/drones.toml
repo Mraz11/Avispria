@@ -1,0 +1,55 @@
+# Aircraft and camera profiles. Every value states its source; `verified = false`
+# means it has not yet been confirmed on real hardware for this project.
+# Confirm camera values from an original photo with:  avispria camera-from-photo
+
+[lito-x1]
+name = "DJI Lito X1"
+max_speed_ms = 12.0            # DJI Fly SPEEDCapability.json for waypoint missions (verified)
+drone_enum = 68                # observed in a DJI Fly mission from a Lito X1 (verified)
+waypoint_limit = 99            # conservative; a secondary source claims 200 (unverified)
+verified = false
+notes = "1/1.3-inch 48 MP sensor. Waypoint speed 0.1-12 m/s and gimbal pitch -90..+40 from DJI Fly capability files. Camera geometry assumed equal to the Mini 4 Pro FC8482 until confirmed from EXIF."
+
+[lito-x1.modes.12mp]
+sensor_width_mm = 8.974        # 4032 px x 0.0022257 mm (published FC8482 calibration); assumed
+sensor_height_mm = 6.717
+focal_mm = 6.72                # EXIF FocalLength reported for FC8482; assumed
+image_width_px = 4032
+image_height_px = 3024
+min_interval_s = 2.0           # assumed; measure with a probe flight
+readout_s = 0.03               # OpenDroneMap default for unknown cameras
+
+[lito-x1.modes.48mp]
+sensor_width_mm = 8.974
+sensor_height_mm = 6.717
+focal_mm = 6.72
+image_width_px = 8064
+image_height_px = 6048
+min_interval_s = 5.0           # Mini 4 Pro report at 48 MP (tutorial); assumed
+readout_s = 0.03
+
+[mini-4-pro]
+name = "DJI Mini 4 Pro"
+max_speed_ms = 16.0            # retailer spec listing
+drone_enum = 68                # FlyPath: verified from a native RC 2 mission dump
+waypoint_limit = 99
+verified = false
+notes = "Camera FC8482. Geometry from a published calibration profile."
+
+[mini-4-pro.modes.12mp]
+sensor_width_mm = 8.974
+sensor_height_mm = 6.717
+focal_mm = 6.72
+image_width_px = 4032
+image_height_px = 3024
+min_interval_s = 2.0
+readout_s = 0.03
+
+[mini-4-pro.modes.48mp]
+sensor_width_mm = 8.974
+sensor_height_mm = 6.717
+focal_mm = 6.72
+image_width_px = 8064
+image_height_px = 6048
+min_interval_s = 5.0
+readout_s = 0.03

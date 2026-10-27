@@ -26,7 +26,6 @@ def test_cli_version_command_prints_version() -> None:
     assert avispria.__version__ in result.output
 
 
-def test_cli_plan_is_a_placeholder_that_exits_with_code_2() -> None:
+def test_cli_plan_without_arguments_is_a_usage_error() -> None:
     result = runner.invoke(app, ["plan"])
     assert result.exit_code == 2
-    assert "not implemented" in result.output

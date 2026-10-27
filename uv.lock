@@ -172,6 +172,7 @@ source = { editable = "." }
 dependencies = [
     { name = "lxml" },
     { name = "nicegui" },
+    { name = "numpy" },
     { name = "pyproj" },
     { name = "rasterio" },
     { name = "shapely" },
@@ -192,6 +193,7 @@ dev = [
 requires-dist = [
     { name = "lxml", specifier = ">=5.0" },
     { name = "nicegui", specifier = ">=2.0" },
+    { name = "numpy", specifier = ">=1.26" },
     { name = "pyproj", specifier = ">=3.6" },
     { name = "rasterio", specifier = ">=1.4.3,<1.5" },
     { name = "shapely", specifier = ">=2.0" },

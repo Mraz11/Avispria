@@ -19,6 +19,7 @@ classifiers = [
   "Topic :: Scientific/Engineering :: GIS",
 ]
 dependencies = [
+  "numpy>=1.26",
   "shapely>=2.0",
   "pyproj>=3.6",
   # <1.5: rasterio 1.5 macOS wheels require macOS 15+. Revisit (see HANDOFF.md).
@@ -67,7 +68,7 @@ files = ["src/avispria/core"]
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
-addopts = "-ra --strict-markers --strict-config --cov=avispria --cov-report=term-missing"
+addopts = "-ra --import-mode=importlib --strict-markers --strict-config --cov=avispria --cov-report=term-missing"
 
 [tool.coverage.run]
 source = ["avispria"]

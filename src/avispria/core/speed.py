@@ -37,7 +37,7 @@ def solve_speed(
     drone_max_ms: float,
     *,
     blur_px: float = 0.5,
-    skew_px: float = 1.0,
+    skew_px: float = 15.0,
     wind_ms: float = 0.0,
     min_speed_ms: float = 1.0,
 ) -> SpeedSolution:
@@ -45,7 +45,10 @@ def solve_speed(
 
     Limits:
       * blur: ground motion during the exposure stays under ``blur_px`` pixels;
-      * skew: ground motion during sensor readout stays under ``skew_px`` pixels;
+      * skew: ground motion during sensor readout stays under ``skew_px`` pixels.
+        The default (15 px) assumes rolling-shutter correction is enabled in the
+        photogrammetry engine, which models this distortion; use ~1 px only if it
+        is not;
       * trigger: the camera can sustain one photo per ``photo_spacing_m``;
       * wind: keep half the drone's top speed as headroom against wind;
       * drone: the aircraft's own maximum.

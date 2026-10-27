@@ -9,8 +9,8 @@ below it.
 
 from __future__ import annotations
 
-import itertools
 from collections.abc import Iterable
+from itertools import pairwise
 
 import numpy as np
 from numpy.typing import NDArray
@@ -27,6 +27,24 @@ def _check(d: FloatArray, h: FloatArray) -> None:
         raise ValueError("distances must be strictly increasing")
     if not (np.all(np.isfinite(d)) and np.all(np.isfinite(h))):
         raise ValueError("profile contains non-finite values")
+
+
+def along_track_envelope(d: FloatArray, h: FloatArray, window_m: float) -> FloatArray:
+    """Moving maximum of ``h`` over +/- ``window_m`` along the path.
+
+    The result is never below ``h``; it turns many small surface kinks into a few
+    plateaus and ramps, so far fewer waypoints are needed for the same guarantee.
+    """
+    d = np.asarray(d, dtype=float)
+    h = np.asarray(h, dtype=float)
+    _check(d, h)
+    if window_m < 0:
+        raise ValueError("window_m must be >= 0")
+    if window_m == 0:
+        return h.copy()
+    lo = np.searchsorted(d, d - window_m, side="left")
+    hi = np.searchsorted(d, d + window_m, side="right")
+    return np.array([h[a:b].max() for a, b in zip(lo, hi, strict=True)])
 
 
 def enforce_slope(d: FloatArray, h: FloatArray, max_slope: float) -> FloatArray:
@@ -48,19 +66,31 @@ def enforce_slope(d: FloatArray, h: FloatArray, max_slope: float) -> FloatArray:
 
 
 def fit_profile(
-    d: FloatArray, h_req: FloatArray, mandatory: Iterable[int], max_excess_m: float
-) -> list[int]:
-    """Choose sample indices to keep as waypoints.
+    d: FloatArray,
+    h_req: FloatArray,
+    mandatory: Iterable[int],
+    max_excess_m: float,
+    *,
+    lift_m: float = 0.0,
+    max_slope: float | None = None,
+) -> tuple[list[int], FloatArray]:
+    """Choose waypoint samples and their heights.
 
-    Guarantees, for every sample between kept points, that the straight line
-    between them is never below ``h_req`` and never more than ``max_excess_m``
-    above it. The first and last samples and all ``mandatory`` indices are kept.
+    Returns ``(keep, heights)``. Guarantees that the straight line between
+    consecutive kept waypoints is never below ``h_req`` at any sample. Waypoints
+    are inserted where a segment dips more than ``lift_m`` below the requirement
+    or rises more than ``max_excess_m`` above it; smaller dips are fixed by
+    lifting the segment's endpoints (at most ``lift_m``). If ``max_slope`` is
+    given, chords steeper than it are fixed by raising the lower endpoint.
+    Heights are only ever raised, so the clearance guarantee holds throughout.
     """
     d = np.asarray(d, dtype=float)
     h = np.asarray(h_req, dtype=float)
     _check(d, h)
     if max_excess_m <= 0:
         raise ValueError("max_excess_m must be positive")
+    if not 0 <= lift_m <= max_excess_m:
+        raise ValueError("lift_m must be in [0, max_excess_m]")
     n = len(d)
     keep = sorted({0, n - 1, *(int(i) for i in mandatory)})
     if keep[0] < 0 or keep[-1] > n - 1:
@@ -69,15 +99,12 @@ def fit_profile(
     while changed:
         changed = False
         new_keep = [keep[0]]
-        for a, b in itertools.pairwise(keep):
+        for a, b in pairwise(keep):
             if b - a > 1:
-                seg = np.arange(a, b + 1)
-                line = np.interp(d[seg], [d[a], d[b]], [h[a], h[b]])
-                deficit = h[seg] - line
-                excess = line - h[seg]
+                deficit, excess = _segment_errors(d, h, a, b)
                 k_def = int(np.argmax(deficit))
                 k_exc = int(np.argmax(excess))
-                if deficit[k_def] > 1e-9:
+                if deficit[k_def] > lift_m + 1e-9:
                     new_keep.append(a + k_def)
                     changed = True
                 elif excess[k_exc] > max_excess_m:
@@ -85,4 +112,20 @@ def fit_profile(
                     changed = True
             new_keep.append(b)
         keep = sorted(set(new_keep))
-    return keep
+
+    heights = h[keep].copy()
+    for j, (a, b) in enumerate(pairwise(keep)):
+        if b - a > 1:
+            deficit, _ = _segment_errors(d, h, a, b)
+            lift = max(float(deficit.max()), 0.0)
+            heights[j] = max(heights[j], h[a] + lift)
+            heights[j + 1] = max(heights[j + 1], h[b] + lift)
+    if max_slope is not None and len(keep) > 1:
+        heights = enforce_slope(d[keep], heights, max_slope)
+    return keep, heights
+
+
+def _segment_errors(d: FloatArray, h: FloatArray, a: int, b: int) -> tuple[FloatArray, FloatArray]:
+    seg = np.arange(a, b + 1)
+    line = np.interp(d[seg], [d[a], d[b]], [h[a], h[b]])
+    return h[seg] - line, line - h[seg]

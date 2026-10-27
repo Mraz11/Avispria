@@ -9,7 +9,9 @@ CAM = CameraProfile("t", 9.0, 6.75, 6.75, 4000, 3000, min_interval_s=2.0, readou
 
 
 def test_readout_skew_binds_in_bright_light() -> None:
-    res = solve_speed(CAM, gsd_m=0.03, shutter_s=1 / 1000, photo_spacing_m=20.0, drone_max_ms=12.0)
+    res = solve_speed(
+        CAM, gsd_m=0.03, shutter_s=1 / 1000, photo_spacing_m=20.0, drone_max_ms=12.0, skew_px=1.0
+    )
     assert res.blur_ms == pytest.approx(15.0)
     assert res.skew_ms == pytest.approx(1.0)
     assert res.speed_ms == pytest.approx(1.0)
@@ -44,3 +46,9 @@ def test_rejects_bad_inputs(kw: dict[str, float]) -> None:
     args.update(kw)
     with pytest.raises(ValueError):
         solve_speed(CAM, **args)
+
+
+def test_default_skew_budget_assumes_engine_correction() -> None:
+    res = solve_speed(CAM, gsd_m=0.02, shutter_s=1 / 2000, photo_spacing_m=20.0, drone_max_ms=12.0)
+    assert res.skew_ms == pytest.approx(15 * 0.02 / 0.03)
+    assert res.speed_ms == pytest.approx(6.0)  # wind headroom (half of max) binds

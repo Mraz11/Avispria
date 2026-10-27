@@ -40,6 +40,8 @@ dev = [
   "ruff>=0.6",
   "mypy>=1.10",
   "pre-commit>=3.7",
+  "types-shapely>=2.0",
+  "lxml-stubs>=0.5",
 ]
 
 [tool.hatch.version]

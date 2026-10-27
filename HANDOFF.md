@@ -1,26 +1,24 @@
-# HANDOFF - 2026-10-26 - session #1 (restarted as Avispria)
+# HANDOFF - 2026-10-27 - session #2 (build)
 ## Done this session
-- Project renamed CanopyPlan -> Avispria; scaffold regenerated from scratch
-  with bootstrap_avispria.ps1 (kept outside the repo, not committed).
-- Beyond spec: scripts/check.py (single gate), tests/test_tools.py,
-  .gitattributes (LF), .python-version, docs/LICENSING.md.
-- Claude self-tested the scaffold in a Linux sandbox (see master handoff 2.3).
+- Core: camera, speed solver, AOI/UTM, strips, DEM sampling/filters, profile
+  fitting (segment-safe, lift-based), planner, sorties, safety validator.
+- WPML: safe KMZ/XML reader, dummy-template bootstrap, writer, independent linter,
+  spot-check sheet. Built against the founder's real Lito X1 DJI Fly file.
+- CLI: drones, inspect, lint, sheet, plan, prepare-copy. GeoTIFF DEM loader.
+- Docs: docs/field/first-test-flight.md.
 ## Current state (command proof)
-- UNVERIFIED on the founder's machine until pasted:
-  uv run python scripts/check.py  (expected last line: "All checks passed.")
-- UNVERIFIED: CI green on ubuntu / windows / macos.
+- 115 tests pass; scripts/check.py green on Linux (Claude sandbox).
+- NOT yet verified: Windows/macOS CI, any real flight.
 ## Open problems / suspicions
-- Name checks pending: PyPI, GitHub search, trademark databases.
-  Risks: "Avis" brand proximity; "avispa" = wasp in Spanish.
-  Pronunciation not yet decided.
-- rasterio capped <1.5 (1.5 macOS wheels need macOS 15+). Revisit after CI.
-- setup-uv pinned to @v10.0.1; if the tag fails to resolve try @v10.0.0.
-- pre-commit-hooks pinned to v6.0.0 (tested 2026-10-26).
-- LICENSE downloaded from gnu.org; AGPL is provisional until ADR-0002.
-- CITATION.cff has REPLACE_ME placeholders (name, GitHub handle).
+- Straight legs (useStraightLine=1) and curve-dip size unverified: probe flight.
+- takePhoto encoding unverified: need a DJI Fly dummy with a Take Photo action.
+- Camera geometry assumed (FC8482); needs an ORIGINAL Lito X1 photo (zipped).
+- Pins: rasterio<1.5 (macOS wheels), numpy<2.5 (rasterio 1.4 read()).
 ## Next single task (ready-to-paste)
-Session 2: ADRs 0001-0003 (prompt in AVISPRIA_MASTER_HANDOFF.md, Section 12).
+After the probe flight: build capture QA (read photo EXIF/XMP: positions,
+RelativeAltitude, gimbal pitch, timestamps) and measure straightness, curve dip
+and photo interval from the founder's probe photos.
 ## Decisions made
-- Name: Avispria. No formal ADRs yet (Session 2).
+- Default photo mode = interval. Curve-dip margin 10 m. Skew budget 15 px.
 ## Do-not-touch notes
-- tests/golden/* stays empty. CLAUDE.md must equal PROJECT_CONTEXT.md.
+- tests/fixtures/dji_fly_dummy/* must stay byte-exact (excluded from hooks).

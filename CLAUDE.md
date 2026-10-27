@@ -46,8 +46,13 @@ Processing: NodeODX over HTTP via pyodx (separate AGPL process).
 ## Domain gotchas
 - DJI Fly has NO official KMZ import for consumer drones. We patch the
   user's own dummy mission KMZ (template.kml + waylines.wpml in a zip).
-- Mini 4 Pro droneEnumValue = 68 (verified by FlyPath from native RC2 dump).
-  Other models: treat as unverified; read the value from the user's dummy.
+- Founder's aircraft: DJI Lito X1 + RC-N3 + Redmi K90 (Android). Verified from
+  their DJI Fly files: droneEnumValue 68 (same as Mini 4 Pro), namespace
+  uav.com/wpmz/1.0.2, waypoint speed 0.1-12 m/s, gimbal pitch -90..+40.
+  Fixtures: tests/fixtures/dji_fly_dummy/ (keep byte-exact; coords shifted).
+- Founder copies DJI Fly files on the phone with FV File Explorer.
+- takePhoto action encoding is NOT yet seen in a DJI Fly file: default to
+  interval (timed-shot) mode until a dummy with a photo action is captured.
 - Fly namespace differs from Pilot 2 namespace; never mix.
 - Copernicus GLO-30 is a DSM (includes canopy), 2011-2015 vintage.
 - DJI RC 2 is MTP-only; ADB works on some controllers/phones.

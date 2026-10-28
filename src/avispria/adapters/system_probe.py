@@ -10,6 +10,7 @@ import os
 import platform
 import shutil
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -36,6 +37,7 @@ class EngineStatus:
     url: str
     reachable: bool
     detail: str
+    needs_token: bool = False
 
 
 def _os_name() -> str:
@@ -104,6 +106,9 @@ def discover_local_services() -> list[tuple[str, int, str, int]]:
 def _probe_node(url: str, timeout: float) -> EngineStatus:
     status, body = _get(url, timeout)
     info = json.loads(body.decode("utf-8", "replace"))
+    if isinstance(info, dict) and "token" in str(info.get("error", "")).lower():
+        # NodeODX started by WebODM is protected by an access token
+        return EngineStatus("Processing node", url, True, "needs its access token", True)
     if not isinstance(info, dict) or "taskQueueCount" not in info:
         raise ValueError("not a processing node")
     engine = f"{info.get('engine', 'engine')} {info.get('engineVersion', '')}".strip()
@@ -171,12 +176,20 @@ def probe_webodm_api(base_url: str, timeout: float = 2.0) -> WebOdmApi:
         return WebOdmApi(None, False, [], _reason(exc))
 
 
+def probe_node(base_url: str, token: str | None = None, timeout: float = 2.0) -> EngineStatus:
+    """Status of a NodeODX/NodeODM node at ``base_url``, optionally with its token."""
+    url = base_url.rstrip("/") + "/info"
+    if token:
+        url += "?" + urllib.parse.urlencode({"token": token})
+    return _probe_node(url, timeout)
+
+
 def classify_service(host: str, port: int, timeout: float = 1.5) -> str:
     """Plain description of what answers on host:port."""
     base = f"http://{host}:{port}"
     try:
         node = _probe_node(base + "/info", timeout)
-        return f"processing node ({node.detail})"
+        return f"processing node ({node.detail})"  # includes "needs its access token"
     except PROBE_ERRORS:
         pass
     try:

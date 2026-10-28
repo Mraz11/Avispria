@@ -228,3 +228,41 @@ def test_classify_services(fake_node: str, redis_like: int) -> None:
     assert classify_service("127.0.0.1", node_port, timeout=2).startswith("processing node")
     assert classify_service("127.0.0.1", redis_like, timeout=2) == "not a web service"
     assert classify_service("127.0.0.1", _free_port(), timeout=0.5) == "no answer"
+
+
+class _TokenNode(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        body = (
+            b'{"engine":"odx","engineVersion":"3.6.2","taskQueueCount":0}'
+            if "token=secret" in self.path
+            else b'{"error":"Invalid authentication token"}'
+        )
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args: object) -> None:
+        pass
+
+
+@pytest.fixture
+def token_node() -> Iterator[int]:
+    server = HTTPServer(("127.0.0.1", 0), _TokenNode)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield int(server.server_port)
+    server.shutdown()
+    server.server_close()
+
+
+def test_token_protected_node_is_recognised(token_node: int) -> None:
+    from avispria.adapters.system_probe import classify_service, probe_node
+
+    assert classify_service("127.0.0.1", token_node, timeout=2) == (
+        "processing node (needs its access token)"
+    )
+    locked = probe_node(f"http://127.0.0.1:{token_node}", timeout=2)
+    assert locked.reachable and locked.needs_token
+    unlocked = probe_node(f"http://127.0.0.1:{token_node}", token="secret", timeout=2)
+    assert not unlocked.needs_token and "odx 3.6.2" in unlocked.detail

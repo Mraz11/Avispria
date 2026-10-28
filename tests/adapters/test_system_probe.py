@@ -47,7 +47,15 @@ def test_probe_system_reads_real_resources(tmp_path: Path) -> None:
     assert spec.os_name
 
 
-def test_engines_found_and_missing(fake_node: str) -> None:
+@pytest.fixture
+def no_discovery(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests must not depend on whatever happens to run on the developer's machine."""
+    from avispria.adapters import system_probe
+
+    monkeypatch.setattr(system_probe, "discover_local_services", lambda: [])
+
+
+def test_engines_found_and_missing(fake_node: str, no_discovery: None) -> None:
     dead = f"http://127.0.0.1:{_free_port()}/"
     found = probe_engines(webodm_url=fake_node + "/", node_url=fake_node + "/info", timeout=2)
     assert [e.reachable for e in found] == [True, True]
@@ -110,3 +118,39 @@ def test_ipv6_loopback_is_probed_with_brackets() -> None:
     assert _local_host("::1") == "[::1]"
     assert _local_host("0.0.0.0") == "127.0.0.1"
     assert _local_host("192.168.1.5") == "192.168.1.5"
+
+
+@pytest.fixture
+def redis_like() -> Iterator[int]:
+    """A TCP service that answers HTTP with a Redis-style error line."""
+    import socketserver
+
+    class Handler(socketserver.BaseRequestHandler):
+        def handle(self) -> None:
+            self.request.recv(1024)
+            self.request.sendall(b"-ERR wrong number of arguments for 'get' command\r\n")
+
+    server = socketserver.TCPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield int(server.server_address[1])
+    server.shutdown()
+    server.server_close()
+
+
+def test_non_http_services_never_crash_the_probe(
+    monkeypatch: pytest.MonkeyPatch, redis_like: int
+) -> None:
+    from avispria.adapters import system_probe
+
+    procs = [
+        _FakeProc(21, "redis-server.exe", r"C:\WebODM\redis\redis-server.exe", [6379]),
+        _FakeProc(22, "webodm.exe", r"C:\WebODM\webodm.exe", [redis_like]),
+    ]
+    monkeypatch.setattr(system_probe.psutil, "process_iter", lambda attrs=None: iter(procs))
+    found = system_probe.discover_local_services()
+    assert [f[0] for f in found] == ["webodm.exe"]  # internal Redis skipped by name
+    engines = system_probe.probe_engines(
+        webodm_url="http://127.0.0.1:1/", node_url="http://127.0.0.1:1/info", timeout=1
+    )
+    assert not any(e.reachable for e in engines)  # odd reply handled, nothing crashed

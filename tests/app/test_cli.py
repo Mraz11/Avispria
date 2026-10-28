@@ -281,3 +281,17 @@ def test_doctor_job_too_big_lists_options(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert result.exit_code == 1
     assert "Not possible on this computer as it is." in result.output
     assert "Split into" in result.output and "works" in result.output
+
+
+def test_doctor_never_crashes_on_engine_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    from avispria.app import doctor as doctor_module
+
+    _fake_doctor(monkeypatch, ram=16.0, webodm=False)
+
+    def boom() -> list[object]:
+        raise RuntimeError("unexpected reply")
+
+    monkeypatch.setattr(doctor_module, "probe_engines", boom)
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 0, result.output
+    assert "not found running" in result.output

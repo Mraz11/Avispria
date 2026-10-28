@@ -57,11 +57,14 @@ def run_doctor(
     system = (system_probe or probe_system)(workdir)
     job, unreadable = (None, 0) if folder is None else job_from_folder(folder, recursive=recursive)
     assessment = None if job is None else assess(system, job, processing_mp)
-    if engine_probe is not None:
-        engines = engine_probe()
-    elif webodm_url:
-        base = webodm_url.rstrip("/")
-        engines = probe_engines(webodm_url=base + "/", node_url=base + "/info")
-    else:
-        engines = probe_engines()
+    try:
+        if engine_probe is not None:
+            engines = engine_probe()
+        elif webodm_url:
+            base = webodm_url.rstrip("/")
+            engines = probe_engines(webodm_url=base + "/", node_url=base + "/info")
+        else:
+            engines = probe_engines()
+    except Exception as exc:  # a diagnostic must report problems, never crash on them
+        engines = [EngineStatus("WebODM", webodm_url or "", False, f"engine check failed: {exc}")]
     return DoctorReport(system, engines, docker_available(), job, assessment, unreadable)

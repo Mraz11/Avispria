@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import platform
@@ -23,6 +24,10 @@ NODEODX_URL = "http://localhost:3000/info"
 # programs that belong to a local photogrammetry stack (matched case-insensitively
 # against the process name and executable path)
 ENGINE_MARKERS = ("webodm", "nodeodx", "nodeodm", "clusterodx", "odx")
+# WebODM bundles internal services that do not speak HTTP; never probe them
+NON_HTTP_SERVICES = ("redis", "postgres", "pg_ctl", "celery", "nginx-cache")
+# anything a non-HTTP or half-broken service can throw at an HTTP probe
+PROBE_ERRORS = (urllib.error.URLError, http.client.HTTPException, OSError, ValueError)
 
 
 @dataclass(frozen=True)
@@ -81,6 +86,8 @@ def discover_local_services() -> list[tuple[str, int, str, int]]:
         label = f"{info.get('name') or ''} {info.get('exe') or ''}".lower()
         if not any(marker in label for marker in ENGINE_MARKERS):
             continue
+        if any(skip in label for skip in NON_HTTP_SERVICES):
+            continue
         try:
             conns = proc.net_connections(kind="inet")
         except (psutil.Error, OSError):
@@ -116,11 +123,11 @@ def probe_engines(
     try:
         status, _ = _get(webodm_url, timeout)
         out.append(EngineStatus("WebODM", webodm_url, status < 500, f"HTTP {status}"))
-    except (urllib.error.URLError, OSError, ValueError) as exc:
+    except PROBE_ERRORS as exc:
         out.append(EngineStatus("WebODM", webodm_url, False, _reason(exc)))
     try:
         out.append(_probe_node(node_url, timeout))
-    except (urllib.error.URLError, OSError, ValueError) as exc:
+    except PROBE_ERRORS as exc:
         out.append(EngineStatus("Processing node", node_url, False, _reason(exc)))
     known = {webodm_url, node_url}
     for name, _pid, host, port in discover_local_services():
@@ -130,11 +137,11 @@ def probe_engines(
             if node.url not in known:
                 out.insert(0, node)
             continue
-        except (urllib.error.URLError, OSError, ValueError):
+        except PROBE_ERRORS:
             pass
         try:
             status, _ = _get(base + "/", timeout)
-        except (urllib.error.URLError, OSError, ValueError):
+        except PROBE_ERRORS:
             continue
         if status < 500 and base + "/" not in known:
             out.insert(0, EngineStatus("WebODM", base + "/", True, f"{name}, HTTP {status}"))

@@ -8,7 +8,9 @@
 - Docs: docs/field/first-test-flight.md.
 ## Current state (command proof)
 - 115 tests pass; scripts/check.py green on Linux (Claude sandbox).
-- NOT yet verified: Windows/macOS CI, any real flight.
+- Windows 11 local run verified 2026-10-27: 115 passed, coverage 89.9%.
+- CI green on ubuntu/windows/macos (run #3, 2026-10-28); release v0.1.0a1.
+- NOT yet verified: any real flight.
 ## Open problems / suspicions
 - Straight legs (useStraightLine=1) and curve-dip size unverified: probe flight.
 - takePhoto encoding unverified: need a DJI Fly dummy with a Take Photo action.

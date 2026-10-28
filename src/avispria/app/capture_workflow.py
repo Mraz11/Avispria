@@ -70,9 +70,13 @@ def camera_chooser(
 
 
 def run_qa(
-    folder: Path, profile: DroneProfile | None, thresholds: QaThresholds | None = None
+    folder: Path,
+    profile: DroneProfile | None,
+    thresholds: QaThresholds | None = None,
+    *,
+    recursive: bool = False,
 ) -> tuple[CaptureReport, list[tuple[str, str]]]:
-    records, skipped = scan_photos(folder)
+    records, skipped = scan_photos(folder, recursive=recursive)
     notes: list[Issue] = []
     report = analyse_capture(records, camera_chooser(profile, notes), thresholds)
     report.issues.extend(notes)

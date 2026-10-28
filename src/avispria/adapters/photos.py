@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -84,15 +85,37 @@ def _sort_key(r: PhotoRecord) -> tuple[float, str]:
     return (t.timestamp(), r.name)
 
 
-def scan_photos(folder: Path) -> tuple[list[PhotoRecord], list[tuple[str, str]]]:
-    """All photos in ``folder`` in capture order, plus (file, reason) for unreadable ones."""
+def _is_photo(path: Path) -> bool:
+    return path.is_file() and path.suffix.lower() in PHOTO_SUFFIXES
+
+
+def scan_photos(
+    folder: Path, *, recursive: bool = False
+) -> tuple[list[PhotoRecord], list[tuple[str, str]]]:
+    """Photos in ``folder`` (and subfolders if ``recursive``) in capture order.
+
+    Also returns (file, reason) for unreadable files. With ``recursive`` the
+    names are paths relative to ``folder`` so files in different folders stay distinct.
+    """
+    candidates = sorted(folder.rglob("*") if recursive else folder.iterdir())
     records: list[PhotoRecord] = []
     skipped: list[tuple[str, str]] = []
-    for path in sorted(folder.iterdir()):
-        if not path.is_file() or path.suffix.lower() not in PHOTO_SUFFIXES:
+    for path in candidates:
+        if not _is_photo(path):
             continue
+        label = path.relative_to(folder).as_posix() if recursive else path.name
         try:
-            records.append(read_photo(path))
+            records.append(replace(read_photo(path), name=label))
         except (ExifError, OSError) as exc:
-            skipped.append((path.name, str(exc)))
+            skipped.append((label, str(exc)))
     return sorted(records, key=_sort_key), skipped
+
+
+def photo_subfolders(folder: Path, limit: int = 10) -> list[tuple[str, int]]:
+    """Subfolders of ``folder`` that directly contain photos, with counts."""
+    counts: dict[Path, int] = {}
+    for path in folder.rglob("*"):
+        if _is_photo(path) and path.parent != folder:
+            counts[path.parent] = counts.get(path.parent, 0) + 1
+    ordered = sorted(counts.items(), key=lambda kv: kv[0].relative_to(folder).as_posix())
+    return [(p.relative_to(folder).as_posix(), n) for p, n in ordered[:limit]]

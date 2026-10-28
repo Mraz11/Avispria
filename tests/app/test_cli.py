@@ -221,3 +221,15 @@ def test_camera_from_photo(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert "[lito-x1.modes.12mp]" in result.output
     assert "sensor_width_mm = 9.692" in result.output
+
+
+def test_qa_points_to_subfolders_with_photos(tmp_path: Path) -> None:
+    inner = _photo_folder(tmp_path, n=4)
+    parent = inner.parent
+    result = runner.invoke(app, ["qa", str(parent)])
+    assert result.exit_code == 1
+    assert "No photos directly in" in result.output
+    assert "photos (4 photos)" in result.output
+    recursive = runner.invoke(app, ["qa", str(parent), "--recursive"])
+    assert recursive.exit_code == 0, recursive.output
+    assert "photos: 4 found, 4 used" in recursive.output

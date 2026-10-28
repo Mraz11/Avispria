@@ -26,6 +26,10 @@ htmlcov/
 !tests/fixtures/**/*.tif
 !tests/fixtures/**/*.tiff
 
+# Patches handed over between sessions (apply with git am, never commit)
+*.patch
+*.diff
+
 # Local work areas and secrets
 /out/
 /work/

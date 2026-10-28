@@ -118,3 +118,23 @@ def test_real_photos_parse() -> None:
     photos, skipped = scan_photos(Path(str(REAL)))
     assert photos and not skipped
     assert all(p.lat is not None and p.relative_altitude_m is not None for p in photos)
+
+
+def test_recursive_scan_and_subfolder_hints(tmp_path: Path) -> None:
+    from avispria.adapters.photos import photo_subfolders
+
+    (tmp_path / "card" / "DCIM" / "100MEDIA").mkdir(parents=True)
+    (tmp_path / "card" / "DCIM" / "101MEDIA").mkdir(parents=True)
+    (tmp_path / "card" / "DCIM" / "100MEDIA" / "a.JPG").write_bytes(jpeg_bytes())
+    (tmp_path / "card" / "DCIM" / "100MEDIA" / "b.JPG").write_bytes(jpeg_bytes())
+    (tmp_path / "card" / "DCIM" / "101MEDIA" / "c.DNG").write_bytes(dng_bytes())
+    card = tmp_path / "card"
+    assert scan_photos(card)[0] == []
+    hints = photo_subfolders(card)
+    assert hints == [("DCIM/100MEDIA", 2), ("DCIM/101MEDIA", 1)]
+    photos, _ = scan_photos(card, recursive=True)
+    assert sorted(p.name for p in photos) == [
+        "DCIM/100MEDIA/a.JPG",
+        "DCIM/100MEDIA/b.JPG",
+        "DCIM/101MEDIA/c.DNG",
+    ]

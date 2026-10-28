@@ -334,8 +334,8 @@ def _print_doctor(r: DoctorReport, workdir: Path) -> None:
         f"{s.swap_total_gb:.1f} GB virtual memory"
     )
     typer.echo(f"  Disk       {s.disk_free_gb:.0f} GB free at {workdir}")
-    webodm = next((e for e in r.engines if e.name == "WebODM"), None)
-    node = next((e for e in r.engines if e.name == "Processing node"), None)
+    webodm = next((e for e in r.engines if e.name == "WebODM" and e.reachable), None)
+    node = next((e for e in r.engines if e.name == "Processing node" and e.reachable), None)
     if webodm is not None and webodm.reachable:
         typer.secho(f"  WebODM     running at {webodm.url}", fg=typer.colors.GREEN)
     elif node is not None and node.reachable:
@@ -343,9 +343,10 @@ def _print_doctor(r: DoctorReport, workdir: Path) -> None:
             f"  Engine     processing node at {node.url} ({node.detail})", fg=typer.colors.GREEN
         )
     else:
-        typer.secho("  WebODM     not found on this computer", fg=typer.colors.YELLOW)
-        typer.echo("             Install it free from https://webodm.org/download and start it,")
-        typer.echo("             then run `avispria doctor` again.")
+        typer.secho("  WebODM     not found running on this computer", fg=typer.colors.YELLOW)
+        typer.echo("             If it is not installed: https://webodm.org/download (free).")
+        typer.echo("             If it is installed, start it and run `avispria doctor` again,")
+        typer.echo("             or give its address: avispria doctor --webodm-url http://...")
     if r.assessment is None or r.job is None:
         if r.unreadable:
             typer.secho(
@@ -385,10 +386,15 @@ def doctor(
     full_resolution: Annotated[
         bool, typer.Option(help="Process photos at full size instead of 12 MP")
     ] = False,
+    webodm_url: Annotated[
+        str | None, typer.Option(help="WebODM address if it is not found automatically")
+    ] = None,
 ) -> None:
     """Check this computer, and whether it can process a photo folder."""
     mp = 1e9 if full_resolution else None
-    report = run_doctor(workdir, folder, recursive=recursive, processing_mp=mp)
+    report = run_doctor(
+        workdir, folder, recursive=recursive, processing_mp=mp, webodm_url=webodm_url
+    )
     _print_doctor(report, workdir.resolve())
     if report.assessment is not None and report.assessment.verdict == "not-possible":
         raise typer.Exit(1)

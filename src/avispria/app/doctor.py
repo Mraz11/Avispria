@@ -50,11 +50,18 @@ def run_doctor(
     *,
     recursive: bool = False,
     processing_mp: float | None = None,
+    webodm_url: str | None = None,
     system_probe: Callable[[Path], SystemSpec] | None = None,
     engine_probe: Callable[[], list[EngineStatus]] | None = None,
 ) -> DoctorReport:
     system = (system_probe or probe_system)(workdir)
     job, unreadable = (None, 0) if folder is None else job_from_folder(folder, recursive=recursive)
     assessment = None if job is None else assess(system, job, processing_mp)
-    engines = (engine_probe or probe_engines)()
+    if engine_probe is not None:
+        engines = engine_probe()
+    elif webodm_url:
+        base = webodm_url.rstrip("/")
+        engines = probe_engines(webodm_url=base + "/", node_url=base + "/info")
+    else:
+        engines = probe_engines()
     return DoctorReport(system, engines, docker_available(), job, assessment, unreadable)

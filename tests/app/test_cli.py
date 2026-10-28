@@ -256,7 +256,7 @@ def test_doctor_without_photos(monkeypatch: pytest.MonkeyPatch) -> None:
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 0, result.output
     assert "16.0 GB total" in result.output
-    assert "webodm.org/download" in result.output
+    assert "webodm.org/download" in result.output and "--webodm-url" in result.output
 
 
 def test_doctor_job_fits(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

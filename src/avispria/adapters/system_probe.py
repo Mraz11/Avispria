@@ -20,6 +20,9 @@ from avispria.core.feasibility import SystemSpec
 GB = 1024**3
 WEBODM_URL = "http://localhost:8000/"
 NODEODX_URL = "http://localhost:3000/info"
+# programs that belong to a local photogrammetry stack (matched case-insensitively
+# against the process name and executable path)
+ENGINE_MARKERS = ("webodm", "nodeodx", "nodeodm", "clusterodx", "odx")
 
 
 @dataclass(frozen=True)
@@ -60,10 +63,55 @@ def _get(url: str, timeout: float) -> tuple[int, bytes]:
         return response.status, response.read(64 * 1024)
 
 
+def _local_host(ip: str) -> str:
+    if ip in ("", "0.0.0.0", "::", "127.0.0.1"):
+        return "127.0.0.1"
+    return f"[{ip}]" if ":" in ip else ip
+
+
+def discover_local_services() -> list[tuple[str, int, str, int]]:
+    """(process name, pid, host, port) for running WebODM/NodeODX-like programs.
+
+    Lets `doctor` find the native WebODM app whatever port it chose, instead of
+    assuming the Docker default. Processes we may not inspect are skipped.
+    """
+    found: set[tuple[str, int, str, int]] = set()
+    for proc in psutil.process_iter(attrs=["pid", "name", "exe"]):
+        info = proc.info
+        label = f"{info.get('name') or ''} {info.get('exe') or ''}".lower()
+        if not any(marker in label for marker in ENGINE_MARKERS):
+            continue
+        try:
+            conns = proc.net_connections(kind="inet")
+        except (psutil.Error, OSError):
+            continue
+        for conn in conns:
+            if getattr(conn, "status", "") == "LISTEN" and conn.laddr:
+                host = _local_host(str(conn.laddr[0]))
+                found.add(
+                    (str(info.get("name") or "?"), int(info["pid"]), host, int(conn.laddr[1]))
+                )
+    return sorted(found, key=lambda item: (item[3], item[1]))
+
+
+def _probe_node(url: str, timeout: float) -> EngineStatus:
+    status, body = _get(url, timeout)
+    info = json.loads(body.decode("utf-8", "replace"))
+    if not isinstance(info, dict) or "taskQueueCount" not in info:
+        raise ValueError("not a processing node")
+    engine = f"{info.get('engine', 'engine')} {info.get('engineVersion', '')}".strip()
+    detail = f"{engine}, {info.get('taskQueueCount', 0)} task(s) queued"
+    return EngineStatus("Processing node", url, status == 200, detail)
+
+
 def probe_engines(
     webodm_url: str = WEBODM_URL, node_url: str = NODEODX_URL, timeout: float = 1.5
 ) -> list[EngineStatus]:
-    """Is WebODM (web app) or a NodeODX/NodeODM processing node answering locally?"""
+    """WebODM (web app) and processing nodes answering locally.
+
+    Checks the usual addresses first, then every port opened by a running
+    WebODM/NodeODX program (the native Windows app may use its own port).
+    """
     out: list[EngineStatus] = []
     try:
         status, _ = _get(webodm_url, timeout)
@@ -71,13 +119,25 @@ def probe_engines(
     except (urllib.error.URLError, OSError, ValueError) as exc:
         out.append(EngineStatus("WebODM", webodm_url, False, _reason(exc)))
     try:
-        status, body = _get(node_url, timeout)
-        info = json.loads(body.decode("utf-8", "replace"))
-        engine = f"{info.get('engine', 'engine')} {info.get('engineVersion', '')}".strip()
-        detail = f"{engine}, {info.get('taskQueueCount', 0)} task(s) queued"
-        out.append(EngineStatus("Processing node", node_url, status == 200, detail))
+        out.append(_probe_node(node_url, timeout))
     except (urllib.error.URLError, OSError, ValueError) as exc:
         out.append(EngineStatus("Processing node", node_url, False, _reason(exc)))
+    known = {webodm_url, node_url}
+    for name, _pid, host, port in discover_local_services():
+        base = f"http://{host}:{port}"
+        try:
+            node = _probe_node(base + "/info", timeout)
+            if node.url not in known:
+                out.insert(0, node)
+            continue
+        except (urllib.error.URLError, OSError, ValueError):
+            pass
+        try:
+            status, _ = _get(base + "/", timeout)
+        except (urllib.error.URLError, OSError, ValueError):
+            continue
+        if status < 500 and base + "/" not in known:
+            out.insert(0, EngineStatus("WebODM", base + "/", True, f"{name}, HTTP {status}"))
     return out
 
 

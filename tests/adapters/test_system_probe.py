@@ -66,3 +66,47 @@ def test_timeouts_and_refusals_both_mean_not_running() -> None:
     assert _reason(urllib.error.URLError(TimeoutError("timed out"))) == "not running"  # Windows
     assert _reason(TimeoutError("timed out")) == "not running"
     assert _reason(urllib.error.URLError("unknown host")) == "unknown host"
+
+
+class _FakeConn:
+    def __init__(self, port: int, status: str = "LISTEN") -> None:
+        self.laddr = ("127.0.0.1", port)
+        self.status = status
+
+
+class _FakeProc:
+    def __init__(self, pid: int, name: str, exe: str, ports: list[int]) -> None:
+        self.info = {"pid": pid, "name": name, "exe": exe}
+        self._ports = ports
+
+    def net_connections(self, kind: str = "inet") -> list[_FakeConn]:
+        return [_FakeConn(p) for p in self._ports] + [_FakeConn(9, "ESTABLISHED")]
+
+
+def test_discovers_webodm_ports_from_running_processes(
+    monkeypatch: pytest.MonkeyPatch, fake_node: str
+) -> None:
+    from avispria.adapters import system_probe
+
+    port = int(fake_node.rsplit(":", 1)[1])
+    procs = [
+        _FakeProc(11, "webodm.exe", r"C:\WebODM\webodm.exe", [port]),
+        _FakeProc(12, "chrome.exe", r"C:\Program Files\Chrome\chrome.exe", [9222]),
+    ]
+    monkeypatch.setattr(system_probe.psutil, "process_iter", lambda attrs=None: iter(procs))
+    found = system_probe.discover_local_services()
+    assert found == [("webodm.exe", 11, "127.0.0.1", port)]
+    engines = system_probe.probe_engines(
+        webodm_url="http://127.0.0.1:1/", node_url="http://127.0.0.1:1/info", timeout=1
+    )
+    discovered = [e for e in engines if e.reachable]
+    assert discovered and discovered[0].url.endswith(f":{port}/info")
+    assert "odx 3.6.2" in discovered[0].detail
+
+
+def test_ipv6_loopback_is_probed_with_brackets() -> None:
+    from avispria.adapters.system_probe import _local_host
+
+    assert _local_host("::1") == "[::1]"
+    assert _local_host("0.0.0.0") == "127.0.0.1"
+    assert _local_host("192.168.1.5") == "192.168.1.5"

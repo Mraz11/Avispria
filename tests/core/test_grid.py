@@ -95,3 +95,20 @@ def test_flight_path_and_densify() -> None:
     assert np.all(np.diff(d) <= 5.0 + 1e-9)
     for i, (x, y) in zip(vertex_idx, path, strict=True):
         assert (xs[i], ys[i]) == pytest.approx((x, y))
+
+
+def test_auto_heading_square_and_duplicate_vertices_are_deterministic() -> None:
+    square = box(0, 0, 100, 100)
+    assert auto_heading(square) in (0.0, 90.0)
+    assert auto_heading(square) == auto_heading(square)
+    dup = Polygon([(0, 0), (0, 0), (400, 0), (400, 40), (0, 40), (0, 0)])
+    assert auto_heading(dup) == pytest.approx(90.0)
+
+
+@settings(max_examples=60, deadline=None)
+@given(st.floats(50, 800), st.floats(10, 49), st.floats(0, 179.9))
+def test_auto_heading_matches_rotation(long: float, short: float, angle: float) -> None:
+    rect = affinity.rotate(box(0, 0, long, short), angle, origin=(0, 0))
+    expected = (90.0 - angle) % 180.0
+    got = auto_heading(rect)
+    assert min(abs(got - expected), 180.0 - abs(got - expected)) < 1e-6

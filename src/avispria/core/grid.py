@@ -81,15 +81,34 @@ def lawnmower(
 
 
 def auto_heading(area: Polygon) -> float:
-    """Heading (0-180 deg) along the longest side of the minimum rotated rectangle."""
-    rect = shapely.oriented_envelope(area)
-    if not isinstance(rect, Polygon):  # degenerate (line-like) area
+    """Heading (0-180 deg) along the longer side of the minimum-area bounding rectangle.
+
+    Uses rotating calipers over the convex hull in plain NumPy so the result is
+    identical on every platform (no library-internal division by zero).
+    """
+    hull = area.convex_hull
+    if not isinstance(hull, Polygon):  # degenerate (line-like) area
         raise ValueError("area has no extent to orient lines along")
-    coords = list(rect.exterior.coords)
-    best = max(itertools.pairwise(coords), key=lambda e: math.dist(e[0], e[1]))
-    (xa, ya), (xb, yb) = best
-    heading = math.degrees(math.atan2(xb - xa, yb - ya)) % 180.0
-    return 0.0 if math.isclose(heading, 180.0) else heading
+    pts = np.asarray(hull.exterior.coords, dtype=float)[:-1]
+    best: tuple[float, float, float, float, float] | None = None
+    for (xa, ya), (xb, yb) in zip(pts, np.roll(pts, -1, axis=0), strict=True):
+        length = math.hypot(xb - xa, yb - ya)
+        if length < 1e-9:
+            continue
+        ux, uy = (xb - xa) / length, (yb - ya) / length
+        along = pts @ np.array([ux, uy])
+        across = pts @ np.array([-uy, ux])
+        width = float(along.max() - along.min())
+        height = float(across.max() - across.min())
+        if best is None or width * height < best[0] - 1e-9:
+            best = (width * height, ux, uy, width, height)
+    if best is None:
+        raise ValueError("area has no extent to orient lines along")
+    _, ux, uy, width, height = best
+    if height > width:  # follow the longer side
+        ux, uy = -uy, ux
+    heading = math.degrees(math.atan2(ux, uy)) % 180.0
+    return 0.0 if math.isclose(heading, 180.0, abs_tol=1e-9) else heading
 
 
 def flight_path(strips: Sequence[Strip]) -> list[Point2]:

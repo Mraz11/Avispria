@@ -2,7 +2,10 @@
 ## Done this session
 - Dependency-free EXIF (JPEG + DNG SubIFD) and DJI XMP readers; photo scanning.
 - Capture QA: GSD, footprints, neighbour overlap, view-count coverage map, blur,
-  gimbal, altitude spread, timing gaps. CLI: `qa`, `camera-from-photo`.
+  gimbal, altitude spread, timing gaps. CLI: `qa` (+ --recursive, subfolder hints),
+  `camera-from-photo`.
+- `doctor`: RAM/swap/CPU/disk (psutil) + WebODM/NodeODX detection + job verdict
+  with alternatives; memory model = OpenDroneMap's published RAM-per-image table.
 - Lito X1 profile now from real EXIF: camera FC9589, sensor 9.692 x 7.269 mm
   (old borrowed values understated GSD by 8%).
 ## Current state (command proof)

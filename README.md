@@ -31,6 +31,10 @@ Read [DISCLAIMER.md](DISCLAIMER.md) before using any output near an aircraft.
   overlap with neighbours, how much of the area is seen by 3+ and 5+ photos,
   motion blur risk, gimbal angle, altitude consistency and timing gaps.
 - Derives a camera profile for any DJI drone from one original photo.
+- `avispria doctor` checks this computer (memory, virtual memory, disk, CPU, whether
+  WebODM is running) and says whether a photo folder can be processed here. If not,
+  it lists what would work: lower resolution, splitting, more virtual memory or a
+  bigger computer, with the memory each option needs.
 
 ## Install (Windows, PowerShell)
 

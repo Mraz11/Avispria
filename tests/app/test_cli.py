@@ -233,3 +233,51 @@ def test_qa_points_to_subfolders_with_photos(tmp_path: Path) -> None:
     recursive = runner.invoke(app, ["qa", str(parent), "--recursive"])
     assert recursive.exit_code == 0, recursive.output
     assert "photos: 4 found, 4 used" in recursive.output
+
+
+def _fake_doctor(monkeypatch: pytest.MonkeyPatch, ram: float, webodm: bool) -> None:
+    from avispria.adapters.system_probe import EngineStatus
+    from avispria.app import doctor as doctor_module
+    from avispria.core.feasibility import SystemSpec
+
+    spec = SystemSpec("Windows 11", 8, ram, ram * 0.6, 4.0, 300.0)
+    engines = [
+        EngineStatus(
+            "WebODM", "http://localhost:8000/", webodm, "HTTP 200" if webodm else "not running"
+        ),
+        EngineStatus("Processing node", "http://localhost:3000/info", False, "not running"),
+    ]
+    monkeypatch.setattr(doctor_module, "probe_system", lambda workdir: spec)
+    monkeypatch.setattr(doctor_module, "probe_engines", lambda: engines)
+
+
+def test_doctor_without_photos(monkeypatch: pytest.MonkeyPatch) -> None:
+    _fake_doctor(monkeypatch, ram=16.0, webodm=False)
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 0, result.output
+    assert "16.0 GB total" in result.output
+    assert "webodm.org/download" in result.output
+
+
+def test_doctor_job_fits(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _fake_doctor(monkeypatch, ram=16.0, webodm=True)
+    result = runner.invoke(app, ["doctor", str(_photo_folder(tmp_path))])
+    assert result.exit_code == 0, result.output
+    assert "WebODM     running" in result.output
+    assert "This computer can process these photos." in result.output
+
+
+def test_doctor_job_too_big_lists_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from avispria.app import doctor as doctor_module
+    from avispria.core.feasibility import JobSpec
+
+    _fake_doctor(monkeypatch, ram=8.0, webodm=True)
+    monkeypatch.setattr(
+        doctor_module,
+        "job_from_folder",
+        lambda folder, recursive=False: (JobSpec(900, 48.8, 54.0), 0),
+    )
+    result = runner.invoke(app, ["doctor", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "Not possible on this computer as it is." in result.output
+    assert "Split into" in result.output and "works" in result.output

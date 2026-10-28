@@ -29,6 +29,8 @@ dependencies = [
   "lxml>=5.0",
   "typer>=0.12",
   "nicegui>=2.0",
+  # RAM/swap/CPU detection for `avispria doctor` (BSD-3); stdlib cannot read swap portably
+  "psutil>=5.9",
 ]
 
 [project.scripts]

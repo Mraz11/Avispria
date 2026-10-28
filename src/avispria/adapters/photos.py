@@ -89,6 +89,12 @@ def _is_photo(path: Path) -> bool:
     return path.is_file() and path.suffix.lower() in PHOTO_SUFFIXES
 
 
+def photo_files(folder: Path, *, recursive: bool = False) -> list[Path]:
+    """Photo files in ``folder`` (and subfolders if ``recursive``), sorted by path."""
+    candidates = folder.rglob("*") if recursive else folder.iterdir()
+    return sorted(p for p in candidates if _is_photo(p))
+
+
 def scan_photos(
     folder: Path, *, recursive: bool = False
 ) -> tuple[list[PhotoRecord], list[tuple[str, str]]]:
@@ -97,12 +103,9 @@ def scan_photos(
     Also returns (file, reason) for unreadable files. With ``recursive`` the
     names are paths relative to ``folder`` so files in different folders stay distinct.
     """
-    candidates = sorted(folder.rglob("*") if recursive else folder.iterdir())
     records: list[PhotoRecord] = []
     skipped: list[tuple[str, str]] = []
-    for path in candidates:
-        if not _is_photo(path):
-            continue
+    for path in photo_files(folder, recursive=recursive):
         label = path.relative_to(folder).as_posix() if recursive else path.name
         try:
             records.append(replace(read_photo(path), name=label))

@@ -15,8 +15,10 @@ from avispria.adapters.exif import ExifError
 from avispria.adapters.photos import photo_subfolders
 from avispria.adapters.profiles import load_profiles
 from avispria.app.capture_workflow import camera_toml, report_csv, run_qa
+from avispria.app.doctor import DoctorReport, run_doctor
 from avispria.app.workflow import PlanBlockedError, PlanOptions, prepare_copy, run_plan
 from avispria.core.errors import PlanningError
+from avispria.core.feasibility import gb
 from avispria.core.geometry import AoiError
 from avispria.core.mission import PhotoMode
 from avispria.core.safety import Issue, SafetyLimits
@@ -314,3 +316,79 @@ def camera_from_photo(
     except (ExifError, ValueError) as exc:
         typer.secho(f"cannot derive camera: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
+
+
+_VERDICT_TEXT = {
+    "ok": ("This computer can process these photos.", typer.colors.GREEN),
+    "slow": ("Possible, but slow: it will rely on virtual memory.", typer.colors.YELLOW),
+    "not-possible": ("Not possible on this computer as it is.", typer.colors.RED),
+}
+
+
+def _print_doctor(r: DoctorReport, workdir: Path) -> None:
+    s = r.system
+    typer.secho("Avispria system check", bold=True)
+    typer.echo(f"  Computer   {s.os_name}, {s.cpu_logical} CPU threads")
+    typer.echo(
+        f"  Memory     {s.ram_total_gb:.1f} GB total, {s.ram_available_gb:.1f} GB free now, "
+        f"{s.swap_total_gb:.1f} GB virtual memory"
+    )
+    typer.echo(f"  Disk       {s.disk_free_gb:.0f} GB free at {workdir}")
+    webodm = next((e for e in r.engines if e.name == "WebODM"), None)
+    node = next((e for e in r.engines if e.name == "Processing node"), None)
+    if webodm is not None and webodm.reachable:
+        typer.secho(f"  WebODM     running at {webodm.url}", fg=typer.colors.GREEN)
+    elif node is not None and node.reachable:
+        typer.secho(
+            f"  Engine     processing node at {node.url} ({node.detail})", fg=typer.colors.GREEN
+        )
+    else:
+        typer.secho("  WebODM     not found on this computer", fg=typer.colors.YELLOW)
+        typer.echo("             Install it free from https://webodm.org/download and start it,")
+        typer.echo("             then run `avispria doctor` again.")
+    if r.assessment is None or r.job is None:
+        if r.unreadable:
+            typer.secho(
+                f"  {r.unreadable} photo file(s) could not be read.", fg=typer.colors.YELLOW
+            )
+        return
+    j, a = r.job, r.assessment
+    typer.echo("")
+    typer.echo(
+        f"Photos  {j.photos} photos, {j.native_mp:.1f} MP each, {j.input_gb:.2f} GB "
+        f"(processed at {a.processing_mp:g} MP)"
+    )
+    typer.echo(
+        f"Needs   about {gb(a.ram_gb)} GB memory and {gb(a.disk_gb)} GB free disk (estimate)"
+    )
+    text, colour = _VERDICT_TEXT[a.verdict]
+    typer.secho(f"Result  {text}", fg=colour, bold=True)
+    for reason in a.reasons:
+        typer.echo(f"        - {reason}")
+    if a.options:
+        typer.echo("What you can do:")
+        for n, o in enumerate(a.options, start=1):
+            mark = ("works, but slow" if o.slow else "works") if o.fits else "not enough alone"
+            need = "" if o.ram_gb is None else f"about {gb(o.ram_gb)} GB, "
+            typer.echo(f"  {n}. {o.description}  [{need}{mark}]")
+
+
+@app.command()
+def doctor(
+    folder: Annotated[
+        Path | None, typer.Argument(exists=True, file_okay=False, help="Photo folder to check")
+    ] = None,
+    workdir: Annotated[Path, typer.Option(help="Where processing will store its files")] = Path(
+        "."
+    ),
+    recursive: Annotated[bool, typer.Option("--recursive", "-r")] = False,
+    full_resolution: Annotated[
+        bool, typer.Option(help="Process photos at full size instead of 12 MP")
+    ] = False,
+) -> None:
+    """Check this computer, and whether it can process a photo folder."""
+    mp = 1e9 if full_resolution else None
+    report = run_doctor(workdir, folder, recursive=recursive, processing_mp=mp)
+    _print_doctor(report, workdir.resolve())
+    if report.assessment is not None and report.assessment.verdict == "not-possible":
+        raise typer.Exit(1)

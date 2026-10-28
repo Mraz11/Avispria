@@ -295,3 +295,29 @@ def test_doctor_never_crashes_on_engine_errors(monkeypatch: pytest.MonkeyPatch) 
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 0, result.output
     assert "not found running" in result.output
+
+
+def test_doctor_details(monkeypatch: pytest.MonkeyPatch) -> None:
+    from avispria.adapters.system_probe import WebOdmApi
+    from avispria.app import doctor as doctor_module
+
+    _fake_doctor(monkeypatch, ram=16.0, webodm=True)
+    monkeypatch.setattr(
+        doctor_module, "discover_local_services", lambda: [("webodm.exe", 7, "127.0.0.1", 29800)]
+    )
+    monkeypatch.setattr(doctor_module, "classify_service", lambda h, p: "web page (HTTP 200)")
+    node = {
+        "label": "node-odx-1",
+        "hostname": "localhost",
+        "port": 3000,
+        "online": True,
+        "engine": "odx",
+        "engine_version": "3.6.2",
+    }
+    monkeypatch.setattr(
+        doctor_module, "probe_webodm_api", lambda url: WebOdmApi(200, False, [node], None)
+    )
+    result = runner.invoke(app, ["doctor", "--details"])
+    assert result.exit_code == 0, result.output
+    assert "webodm.exe (pid 7)  127.0.0.1:29800  ->  web page (HTTP 200)" in result.output
+    assert "processing node node-odx-1: localhost:3000, online, odx 3.6.2" in result.output

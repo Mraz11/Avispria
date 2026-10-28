@@ -6,6 +6,7 @@ import threading
 from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -154,3 +155,76 @@ def test_non_http_services_never_crash_the_probe(
         webodm_url="http://127.0.0.1:1/", node_url="http://127.0.0.1:1/info", timeout=1
     )
     assert not any(e.reachable for e in engines)  # odd reply handled, nothing crashed
+
+
+class _FakeWebOdm(BaseHTTPRequestHandler):
+    nodes: ClassVar[list[dict[str, object]]] = [
+        {
+            "id": 1,
+            "label": "node-odx-1",
+            "hostname": "localhost",
+            "port": 3000,
+            "online": True,
+            "engine": "odx",
+            "engine_version": "3.6.2",
+        }
+    ]
+    require_login = False
+
+    def do_GET(self) -> None:
+        if self.path.startswith("/api/processingnodes/"):
+            if self.require_login:
+                self.send_response(403)
+                self.end_headers()
+                self.wfile.write(b'{"detail":"Authentication credentials were not provided."}')
+                return
+            body = json.dumps(self.nodes).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"<html>WebODM</html>")
+
+    def log_message(self, *args: object) -> None:
+        pass
+
+
+@pytest.fixture
+def fake_webodm() -> Iterator[tuple[str, type[_FakeWebOdm]]]:
+    handler = type("H", (_FakeWebOdm,), {})
+    server = HTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{server.server_port}/", handler
+    server.shutdown()
+    server.server_close()
+
+
+def test_webodm_api_lists_processing_nodes(fake_webodm: tuple[str, type[_FakeWebOdm]]) -> None:
+    from avispria.adapters.system_probe import probe_webodm_api
+
+    url, _ = fake_webodm
+    api = probe_webodm_api(url, timeout=2)
+    assert api.status == 200 and not api.needs_login
+    assert api.nodes[0]["label"] == "node-odx-1" and api.nodes[0]["online"] is True
+
+
+def test_webodm_api_reports_login_required(fake_webodm: tuple[str, type[_FakeWebOdm]]) -> None:
+    from avispria.adapters.system_probe import probe_webodm_api
+
+    url, handler = fake_webodm
+    handler.require_login = True
+    api = probe_webodm_api(url, timeout=2)
+    assert api.needs_login and api.nodes == []
+
+
+def test_classify_services(fake_node: str, redis_like: int) -> None:
+    from avispria.adapters.system_probe import classify_service
+
+    node_port = int(fake_node.rsplit(":", 1)[1])
+    assert classify_service("127.0.0.1", node_port, timeout=2).startswith("processing node")
+    assert classify_service("127.0.0.1", redis_like, timeout=2) == "not a web service"
+    assert classify_service("127.0.0.1", _free_port(), timeout=0.5) == "no answer"

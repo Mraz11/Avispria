@@ -148,6 +148,49 @@ def probe_engines(
     return out
 
 
+@dataclass(frozen=True)
+class WebOdmApi:
+    status: int | None
+    needs_login: bool
+    nodes: list[dict[str, object]]
+    error: str | None
+
+
+def probe_webodm_api(base_url: str, timeout: float = 2.0) -> WebOdmApi:
+    """Ask WebODM for its processing nodes (tells us whether the API needs a login)."""
+    url = base_url.rstrip("/") + "/api/processingnodes/"
+    request = urllib.request.Request(url, headers={"User-Agent": "avispria-doctor"})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            data = json.loads(response.read(256 * 1024).decode("utf-8", "replace"))
+            nodes = [n for n in data if isinstance(n, dict)] if isinstance(data, list) else []
+            return WebOdmApi(response.status, False, nodes, None)
+    except urllib.error.HTTPError as exc:
+        return WebOdmApi(exc.code, exc.code in (401, 403), [], None)
+    except PROBE_ERRORS as exc:
+        return WebOdmApi(None, False, [], _reason(exc))
+
+
+def classify_service(host: str, port: int, timeout: float = 1.5) -> str:
+    """Plain description of what answers on host:port."""
+    base = f"http://{host}:{port}"
+    try:
+        node = _probe_node(base + "/info", timeout)
+        return f"processing node ({node.detail})"
+    except PROBE_ERRORS:
+        pass
+    try:
+        status, _ = _get(base + "/", timeout)
+        return f"web page (HTTP {status})"
+    except urllib.error.HTTPError as exc:
+        return f"web page (HTTP {exc.code})"
+    except (http.client.HTTPException, ValueError):
+        return "not a web service"
+    except PROBE_ERRORS as exc:
+        reason = _reason(exc)
+        return "no answer" if reason == "not running" else "not a web service"
+
+
 def _reason(exc: Exception) -> str:
     """Plain-language reason a local engine did not answer.
 

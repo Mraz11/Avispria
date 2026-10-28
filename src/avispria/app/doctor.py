@@ -12,9 +12,13 @@ from pathlib import Path
 from avispria.adapters.photos import photo_files, scan_photos
 from avispria.adapters.system_probe import (
     EngineStatus,
+    WebOdmApi,
+    classify_service,
+    discover_local_services,
     docker_available,
     probe_engines,
     probe_system,
+    probe_webodm_api,
 )
 from avispria.core.feasibility import Assessment, JobSpec, SystemSpec, assess
 
@@ -68,3 +72,21 @@ def run_doctor(
     except Exception as exc:  # a diagnostic must report problems, never crash on them
         engines = [EngineStatus("WebODM", webodm_url or "", False, f"engine check failed: {exc}")]
     return DoctorReport(system, engines, docker_available(), job, assessment, unreadable)
+
+
+@dataclass(frozen=True)
+class DoctorDetails:
+    services: list[tuple[str, int, str, int, str]]  # name, pid, host, port, what answered
+    api: WebOdmApi | None
+    api_url: str | None
+
+
+def collect_details(engines: list[EngineStatus]) -> DoctorDetails:
+    """Everything WebODM-related that runs here, and what WebODM's API says."""
+    services = [
+        (name, pid, host, port, classify_service(host, port))
+        for name, pid, host, port in discover_local_services()
+    ]
+    webodm = next((e for e in engines if e.name == "WebODM" and e.reachable), None)
+    api = None if webodm is None else probe_webodm_api(webodm.url)
+    return DoctorDetails(services, api, None if webodm is None else webodm.url)

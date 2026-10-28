@@ -1,26 +1,23 @@
-# HANDOFF - 2026-10-27 - session #2 (build)
+# HANDOFF - 2026-10-28 - session #3 (capture QA)
 ## Done this session
-- Core: camera, speed solver, AOI/UTM, strips, DEM sampling/filters, profile
-  fitting (segment-safe, lift-based), planner, sorties, safety validator.
-- WPML: safe KMZ/XML reader, dummy-template bootstrap, writer, independent linter,
-  spot-check sheet. Built against the founder's real Lito X1 DJI Fly file.
-- CLI: drones, inspect, lint, sheet, plan, prepare-copy. GeoTIFF DEM loader.
-- Docs: docs/field/first-test-flight.md.
+- Dependency-free EXIF (JPEG + DNG SubIFD) and DJI XMP readers; photo scanning.
+- Capture QA: GSD, footprints, neighbour overlap, view-count coverage map, blur,
+  gimbal, altitude spread, timing gaps. CLI: `qa`, `camera-from-photo`.
+- Lito X1 profile now from real EXIF: camera FC9589, sensor 9.692 x 7.269 mm
+  (old borrowed values understated GSD by 8%).
 ## Current state (command proof)
-- 115 tests pass; scripts/check.py green on Linux (Claude sandbox).
 - Windows 11 local run verified 2026-10-27: 115 passed, coverage 89.9%.
 - CI green on ubuntu/windows/macos (run #3, 2026-10-28); release v0.1.0a1.
-- NOT yet verified: any real flight.
+- This session: 134 tests pass (Linux sandbox); real-DNG test passes on founder photos.
 ## Open problems / suspicions
-- Straight legs (useStraightLine=1) and curve-dip size unverified: probe flight.
-- takePhoto encoding unverified: need a DJI Fly dummy with a Take Photo action.
-- Camera geometry assumed (FC8482); needs an ORIGINAL Lito X1 photo (zipped).
-- Pins: rasterio<1.5 (macOS wheels), numpy<2.5 (rasterio 1.4 read()).
+- No flight possible for ~1 month (founder near an airport).
+- Straight legs, curve dip, real photo interval still need the probe flight.
+- takePhoto encoding still unseen; interval mode remains the default.
+- Footprints assume flat ground at takeoff level; add DEM-aware footprints later.
 ## Next single task (ready-to-paste)
-After the probe flight: build capture QA (read photo EXIF/XMP: positions,
-RelativeAltitude, gimbal pitch, timestamps) and measure straightness, curve dip
-and photo interval from the founder's probe photos.
+Processing orchestration: drive a local WebODM/NodeODX node via PyODX from a QA'd
+photo folder (Phase 2b), with presets and the provenance bundle.
 ## Decisions made
-- Default photo mode = interval. Curve-dip margin 10 m. Skew budget 15 px.
+- Coverage metric = share of the area seen by >=3 and >=5 photos.
 ## Do-not-touch notes
-- tests/fixtures/dji_fly_dummy/* must stay byte-exact (excluded from hooks).
+- tests/fixtures/* stay byte-exact; photo fixture holds metadata only (no images).

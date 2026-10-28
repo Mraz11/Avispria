@@ -1,0 +1,97 @@
+{
+  "_provenance": "Founder's Lito X1 manual 2x2 capture, 2026-10-24, 48 MP DNG. Positions moved to Greenwich preserving metric east/north offsets; serial numbers removed.",
+  "photos": [
+    {
+      "file": "DJI_20261024120456_0042_D.DNG",
+      "create_date": "2026:10:24 12:04:56",
+      "lat": 51.4769,
+      "lon": -0.0015,
+      "relative_altitude_m": 199.3,
+      "gimbal_pitch_deg": -90.0,
+      "gimbal_yaw_deg": 4.5,
+      "flight_speed_ms": [
+        0.0,
+        0.1,
+        0.0
+      ],
+      "exposure_s": 0.000625,
+      "iso": 130,
+      "focal_mm": 6.72,
+      "focal_35mm": 24,
+      "width_px": 8064,
+      "height_px": 6048,
+      "model": "FC9589",
+      "product": "Lito X1",
+      "shutter": "Electronic"
+    },
+    {
+      "file": "DJI_20261024120528_0043_D.DNG",
+      "create_date": "2026:10:24 12:05:28",
+      "lat": 51.476703444,
+      "lon": -0.003979971,
+      "relative_altitude_m": 199.4,
+      "gimbal_pitch_deg": -90.0,
+      "gimbal_yaw_deg": 4.5,
+      "flight_speed_ms": [
+        0.0,
+        0.1,
+        0.1
+      ],
+      "exposure_s": 0.0004,
+      "iso": 140,
+      "focal_mm": 6.72,
+      "focal_35mm": 24,
+      "width_px": 8064,
+      "height_px": 6048,
+      "model": "FC9589",
+      "product": "Lito X1",
+      "shutter": "Electronic"
+    },
+    {
+      "file": "DJI_20261024120558_0044_D.DNG",
+      "create_date": "2026:10:24 12:05:58",
+      "lat": 51.476317111,
+      "lon": -0.003903335,
+      "relative_altitude_m": 199.6,
+      "gimbal_pitch_deg": -90.0,
+      "gimbal_yaw_deg": 4.5,
+      "flight_speed_ms": [
+        -0.2,
+        0.0,
+        0.0
+      ],
+      "exposure_s": 0.0005,
+      "iso": 140,
+      "focal_mm": 6.72,
+      "focal_35mm": 24,
+      "width_px": 8064,
+      "height_px": 6048,
+      "model": "FC9589",
+      "product": "Lito X1",
+      "shutter": "Electronic"
+    },
+    {
+      "file": "DJI_20261024120634_0045_D.DNG",
+      "create_date": "2026:10:24 12:06:34",
+      "lat": 51.476509639,
+      "lon": -0.001376028,
+      "relative_altitude_m": 199.6,
+      "gimbal_pitch_deg": -90.0,
+      "gimbal_yaw_deg": 4.5,
+      "flight_speed_ms": [
+        0.0,
+        0.0,
+        0.1
+      ],
+      "exposure_s": 0.0006666666667,
+      "iso": 120,
+      "focal_mm": 6.72,
+      "focal_35mm": 24,
+      "width_px": 8064,
+      "height_px": 6048,
+      "model": "FC9589",
+      "product": "Lito X1",
+      "shutter": "Electronic"
+    }
+  ]
+}

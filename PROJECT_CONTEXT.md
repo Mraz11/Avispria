@@ -49,6 +49,7 @@ Processing: NodeODX over HTTP via pyodx (separate AGPL process).
 - Founder's aircraft: DJI Lito X1 + RC-N3 + Redmi K90 (Android). Verified from
   their DJI Fly files: droneEnumValue 68 (same as Mini 4 Pro), namespace
   uav.com/wpmz/1.0.2, waypoint speed 0.1-12 m/s, gimbal pitch -90..+40.
+  DJI Fly 1.21.16. Camera FC9589 (6.72 mm, 24 mm-equiv, 8064x6048, electronic shutter).
   Fixtures: tests/fixtures/dji_fly_dummy/ (keep byte-exact; coords shifted).
 - Founder copies DJI Fly files on the phone with FV File Explorer.
 - takePhoto action encoding is NOT yet seen in a DJI Fly file: default to

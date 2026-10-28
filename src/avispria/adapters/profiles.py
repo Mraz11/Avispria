@@ -17,6 +17,7 @@ from avispria.core.camera import CameraProfile
 class DroneProfile:
     key: str
     name: str
+    camera_model: str | None
     max_speed_ms: float
     drone_enum: int
     waypoint_limit: int
@@ -46,6 +47,7 @@ def _parse(data: dict[str, Any]) -> dict[str, DroneProfile]:
         profiles[key] = DroneProfile(
             key=key,
             name=str(raw["name"]),
+            camera_model=raw.get("camera_model"),
             max_speed_ms=float(raw["max_speed_ms"]),
             drone_enum=int(raw["drone_enum"]),
             waypoint_limit=int(raw["waypoint_limit"]),

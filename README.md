@@ -27,6 +27,10 @@ Read [DISCLAIMER.md](DISCLAIMER.md) before using any output near an aircraft.
 - Writes DJI Fly KMZ files built on **your own** DJI Fly dummy mission, then lints
   every file independently and writes an RC spot-check sheet and a provenance report.
 - Refuses to write anything if a safety check fails.
+- Checks a folder of photos (JPEG or DNG) from metadata alone: ground resolution,
+  overlap with neighbours, how much of the area is seen by 3+ and 5+ photos,
+  motion blur risk, gimbal angle, altitude consistency and timing gaps.
+- Derives a camera profile for any DJI drone from one original photo.
 
 ## Install (Windows, PowerShell)
 

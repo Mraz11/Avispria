@@ -80,7 +80,14 @@ def test_plan_flat_writes_lint_clean_files(aoi: Path, tmp_path: Path) -> None:
     assert sorted(out.glob("*_spotcheck.csv"))
     report = json.loads((out / "plan_report.json").read_text())
     assert report["missions"][0]["plan_hash"]
-    assert {w["code"] for w in report["warnings"]} >= {"SAF008", "AVI003"}
+    codes = {w["code"] for w in report["warnings"]}
+    assert "SAF008" in codes and "AVI003" not in codes  # Lito X1 profile is verified
+
+
+def test_unverified_profile_is_flagged(aoi: Path, tmp_path: Path) -> None:
+    result = _plan(aoi, tmp_path / "out", "--flat", "--drone", "mini-4-pro")
+    assert result.exit_code == 0, result.output
+    assert "AVI003" in result.output
 
 
 def test_plan_with_geotiff_dem_follows_terrain(aoi: Path, dem: Path, tmp_path: Path) -> None:
@@ -153,3 +160,64 @@ def test_dem_that_misses_the_area_is_rejected(aoi: Path, tmp_path: Path) -> None
     result = _plan(aoi, tmp_path / "out", "--dem", str(far))
     assert result.exit_code == 1
     assert "does not cover" in result.output
+
+
+def _photo_folder(tmp_path: Path, n: int = 12) -> Path:
+    from tiffbuild import IFD_POINTER, build_tiff, dji_xmp, jpeg_with
+
+    folder = tmp_path / "photos"
+    folder.mkdir()
+    for k in range(n):
+        xmp = dji_xmp(
+            GpsLatitude=f"{51.4769 + (k % 6) * 0.0001:.7f}",
+            GpsLongitude=f"{-0.0015 + (k // 6) * 0.0003:.7f}",
+            RelativeAltitude="60.0",
+            GimbalPitchDegree="-90.0",
+            GimbalYawDegree="0.0",
+            FlightXSpeed="3.0",
+            FlightYSpeed="0.0",
+            ProductName="Lito X1",
+        )
+        ifds = {
+            "ifd0": [(271, 2, "DJI"), (272, 2, "FC9589"), (34665, IFD_POINTER, "exif")],
+            "exif": [
+                (33434, 5, [(1, 2000)]),
+                (36867, 2, f"2026:10:24 12:00:{2 * k:02d}"),
+                (37386, 5, [(672, 100)]),
+                (41989, 3, 24),
+                (40962, 4, 4032),
+                (40963, 4, 3024),
+            ],
+        }
+        (folder / f"DJI_{k:04d}.JPG").write_bytes(
+            jpeg_with(build_tiff(ifds, ["ifd0", "exif"]), xmp)
+        )
+    return folder
+
+
+def test_qa_command_reports_and_writes_csv(tmp_path: Path) -> None:
+    folder = _photo_folder(tmp_path)
+    csv_path = tmp_path / "qa.csv"
+    result = runner.invoke(app, ["qa", str(folder), "--drone", "lito-x1", "--csv", str(csv_path)])
+    assert result.exit_code == 0, result.output
+    assert "photos: 12 found, 12 used" in result.output
+    assert csv_path.read_text().count("\n") == 13
+
+
+def test_qa_without_profile_derives_camera_from_exif(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["qa", str(_photo_folder(tmp_path))])
+    assert result.exit_code == 0, result.output
+    assert "GSD" in result.output
+
+
+def test_qa_too_few_photos_fails(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["qa", str(_photo_folder(tmp_path, n=2))])
+    assert result.exit_code == 1 and "QA009" in result.output
+
+
+def test_camera_from_photo(tmp_path: Path) -> None:
+    photo = next(_photo_folder(tmp_path, n=1).iterdir())
+    result = runner.invoke(app, ["camera-from-photo", str(photo), "--key", "lito-x1"])
+    assert result.exit_code == 0, result.output
+    assert "[lito-x1.modes.12mp]" in result.output
+    assert "sensor_width_mm = 9.692" in result.output

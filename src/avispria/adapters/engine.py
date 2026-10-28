@@ -4,11 +4,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from urllib.parse import urlencode, urlparse
 
-from pyodx import Node
+from pyodx import Node, Task
 from pyodx import exceptions as odx_errors
+from pyodx.types import TaskStatus
 
 GB = 1024**3
 
@@ -69,3 +72,78 @@ def describe(node: Node) -> EngineInfo:
         max_images=getattr(info, "max_images", None),
         options=frozenset(o.name for o in options),
     )
+
+
+@dataclass(frozen=True)
+class TaskOutcome:
+    uuid: str
+    completed: bool
+    status: str
+    error: str
+    processing_s: float
+    log_tail: list[str]
+
+
+def submit(
+    node: Node,
+    files: list[Path],
+    options: dict[str, object],
+    name: str,
+    on_upload: Callable[[float], None] | None = None,
+) -> Task:
+    """Create a task and upload ``files``; ``on_upload`` gets 0-100 percentages."""
+    try:
+        return node.create_task(
+            [str(f) for f in files],
+            options,
+            name=name,
+            progress_callback=on_upload,
+            parallel_uploads=4,
+        )
+    except (odx_errors.GenericError, OSError) as exc:
+        raise _friendly(exc, node) from exc
+
+
+def wait(
+    task: Task,
+    on_status: Callable[[float, str], None] | None = None,
+    interval: float = 3.0,
+) -> TaskOutcome:
+    """Block until the task ends; ``on_status`` gets (progress %, status name)."""
+
+    def report(info: object) -> None:
+        if on_status is not None:
+            status = getattr(info, "status", None)
+            on_status(float(getattr(info, "progress", 0) or 0), getattr(status, "name", "?"))
+
+    try:
+        task.wait_for_completion(status_callback=report, interval=interval)
+    except odx_errors.TaskFailedError:
+        pass
+    except (odx_errors.GenericError, OSError) as exc:
+        raise _friendly(exc, task.node) from exc
+    info = task.info()
+    completed = info.status == TaskStatus.COMPLETED
+    tail: list[str] = []
+    if not completed:
+        try:
+            tail = [str(line) for line in task.output(-40)]
+        except (odx_errors.GenericError, OSError):
+            tail = []
+    return TaskOutcome(
+        uuid=task.uuid,
+        completed=completed,
+        status=info.status.name,
+        error=str(info.last_error or ""),
+        processing_s=max(0.0, float(info.processing_time or 0) / 1000.0),
+        log_tail=tail,
+    )
+
+
+def download_results(task: Task, destination: Path) -> Path:
+    """Download all outputs as one zip (the archive WebODM's Import button accepts)."""
+    destination.mkdir(parents=True, exist_ok=True)
+    try:
+        return Path(task.download_zip(str(destination)))
+    except (odx_errors.GenericError, OSError) as exc:
+        raise _friendly(exc, task.node) from exc

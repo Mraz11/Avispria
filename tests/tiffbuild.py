@@ -24,6 +24,8 @@ def _encode(typ: int, value: object) -> tuple[bytes, int]:
         return b"".join(struct.pack("<I", int(v)) for v in vals), len(vals)
     if typ == 5:
         return b"".join(struct.pack("<II", n, d) for n, d in vals), len(vals)
+    if typ == 12:
+        return b"".join(struct.pack("<d", float(v)) for v in vals), len(vals)
     raise ValueError(typ)
 
 

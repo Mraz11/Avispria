@@ -138,3 +138,14 @@ def test_recursive_scan_and_subfolder_hints(tmp_path: Path) -> None:
         "DCIM/100MEDIA/b.JPG",
         "DCIM/101MEDIA/c.DNG",
     ]
+
+
+def test_exif_numeric_types_from_other_software() -> None:
+    """Some writers store focal length as DOUBLE or SHORT instead of RATIONAL."""
+    for focal_entry in [(37386, 12, 6.72), (37386, 3, 7)]:
+        ifds = {
+            "ifd0": [(271, 2, "X"), (34665, IFD_POINTER, "exif")],
+            "exif": [focal_entry, (40962, 4, 100), (40963, 4, 100)],
+        }
+        e = read_exif(build_tiff(ifds, ["ifd0", "exif"]))
+        assert e.focal_mm == pytest.approx(float(focal_entry[2]))

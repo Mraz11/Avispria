@@ -8,7 +8,7 @@ import json
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
 INFO = {
@@ -51,25 +51,105 @@ OPTIONS = [
 ]
 
 
-def _handler(token: str) -> type[BaseHTTPRequestHandler]:
+class FakeState:
+    """What the fake engine received and how the task should end."""
+
+    def __init__(self, token: str, outcome: str = "complete") -> None:
+        self.token = token
+        self.outcome = outcome  # "complete" or "fail"
+        self.options: list[dict[str, object]] = []
+        self.uploads = 0
+        self.polls = 0
+        self.uuid = "4f1c-test-task"
+
+
+def results_zip() -> bytes:
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("odm_orthophoto/odm_orthophoto.tif", b"fake orthophoto")
+        z.writestr("odm_dem/dsm.tif", b"fake dsm")
+        z.writestr("odm_georeferencing/odm_georeferenced_model.laz", b"fake laz")
+        z.writestr("log.json", b"{}")
+    return buf.getvalue()
+
+
+def _handler(state: FakeState) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
-        def _send(self, payload: object) -> None:
-            body = json.dumps(payload).encode()
+        def _send(self, payload: object, raw: bytes | None = None) -> None:
+            body = raw if raw is not None else json.dumps(payload).encode()
             self.send_response(200)
-            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Type", "application/zip" if raw else "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
 
-        def do_GET(self) -> None:
-            url = urlparse(self.path)
-            if parse_qs(url.query).get("token", [""])[0] != token:
+        def _authorised(self) -> bool:
+            query = parse_qs(urlparse(self.path).query)
+            if query.get("token", [""])[0] != state.token:
                 self._send({"error": "Invalid authentication token: token does not match."})
+                return False
+            return True
+
+        def do_GET(self) -> None:
+            if not self._authorised():
                 return
-            if url.path == "/info":
+            path = urlparse(self.path).path
+            if path == "/info":
                 self._send(INFO)
-            elif url.path == "/options":
+            elif path == "/options":
                 self._send(OPTIONS)
+            elif path == f"/task/{state.uuid}/info":
+                state.polls += 1
+                done = state.polls >= 2
+                code = 20 if not done else (40 if state.outcome == "complete" else 30)
+                status: dict[str, object] = {"code": code}
+                if done and state.outcome == "fail":
+                    status["errorMessage"] = "Process exited with code 1"
+                self._send(
+                    {
+                        "uuid": state.uuid,
+                        "name": "test",
+                        "dateCreated": 1_793_200_000_000,
+                        "processingTime": 61_000 if done else 30_000,
+                        "status": status,
+                        "options": state.options,
+                        "imagesCount": state.uploads,
+                        "progress": 100 if done else 40,
+                    }
+                )
+            elif path == f"/task/{state.uuid}/output":
+                self._send(
+                    [
+                        "[INFO] running sfm",
+                        "[ERROR] not enough memory" if state.outcome == "fail" else "[INFO] done",
+                    ]
+                )
+            elif path == f"/task/{state.uuid}/download/all.zip":
+                self._send(None, raw=results_zip())
+            else:
+                self._send({"error": "not found"})
+
+        def do_POST(self) -> None:
+            length = int(self.headers.get("Content-Length") or 0)
+            body = self.rfile.read(length) if length else b""
+            if not self._authorised():
+                return
+            path = urlparse(self.path).path
+            if path == "/task/new/init":
+                marker = body.find(b'name="options"')
+                if marker >= 0:
+                    start = body.find(b"\r\n\r\n", marker) + 4
+                    end = body.find(b"\r\n--", start)
+                    state.options = json.loads(body[start:end].decode())
+                self._send({"uuid": state.uuid})
+            elif path == f"/task/new/upload/{state.uuid}":
+                state.uploads += body.count(b'name="images"')
+                self._send({"success": True})
+            elif path == f"/task/new/commit/{state.uuid}":
+                self._send({"uuid": state.uuid})
             else:
                 self._send({"error": "not found"})
 
@@ -80,12 +160,23 @@ def _handler(token: str) -> type[BaseHTTPRequestHandler]:
 
 
 @contextmanager
-def fake_nodeodx(token: str = "s3cret") -> Iterator[int]:
-    server = HTTPServer(("127.0.0.1", 0), _handler(token))
+def fake_nodeodx(token: str = "s3cret", outcome: str = "complete") -> Iterator[int]:
+    with fake_engine(token, outcome) as (port, _state):
+        yield port
+
+
+@contextmanager
+def fake_engine(
+    token: str = "s3cret", outcome: str = "complete"
+) -> Iterator[tuple[int, FakeState]]:
+    from http.server import ThreadingHTTPServer
+
+    state = FakeState(token, outcome)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _handler(state))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        yield int(server.server_port)
+        yield int(server.server_port), state
     finally:
         server.shutdown()
         server.server_close()

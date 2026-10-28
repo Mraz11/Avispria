@@ -60,6 +60,14 @@ def run_doctor(
 ) -> DoctorReport:
     system = (system_probe or probe_system)(workdir)
     job, unreadable = (None, 0) if folder is None else job_from_folder(folder, recursive=recursive)
+    if job is not None and folder is not None and processing_mp is None:
+        raw = [
+            p
+            for p in photo_files(folder, recursive=recursive)
+            if p.suffix.lower() not in (".jpg", ".jpeg")
+        ]
+        if raw:  # `avispria process` sends raw photos at full size (it only resizes JPEG)
+            processing_mp = job.native_mp
     assessment = None if job is None else assess(system, job, processing_mp)
     try:
         if engine_probe is not None:

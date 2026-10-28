@@ -355,3 +355,15 @@ def test_engine_with_wrong_token(monkeypatch: pytest.MonkeyPatch) -> None:
             app, ["engine", "--url", f"http://127.0.0.1:{port}", "--token", "wrong"]
         )
     assert result.exit_code == 1 and "rejected the access token" in result.output
+
+
+def test_doctor_assumes_full_size_for_raw_photos(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _fake_doctor(monkeypatch, ram=16.0, webodm=True)
+    folder = _photo_folder(tmp_path, n=6)
+    first = next(folder.iterdir())
+    first.rename(first.with_suffix(".DNG"))  # one raw file in the set
+    result = runner.invoke(app, ["doctor", str(folder)])
+    assert result.exit_code == 0, result.output
+    assert "processed at 12.2 MP" not in result.output

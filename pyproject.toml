@@ -33,6 +33,8 @@ dependencies = [
   "psutil>=5.9",
   # official NodeODX client from the WebODM project (BSD-3-Clause)
   "pyodx>=1.5.14",
+  # resize photos before processing, keeping EXIF and XMP (HPND licence)
+  "pillow>=11.0",
 ]
 
 [project.scripts]
@@ -80,6 +82,9 @@ filterwarnings = [
   "error",
   # affine (used by rasterio) announces a future operator change; not our code
   "ignore:Use `@` matmul instead of `\\*` mul operator:PendingDeprecationWarning",
+  # PyODX 1.5.14 uses datetime.utcfromtimestamp(); harmless until Python removes it.
+  # Narrowly ignored for that module only; to report upstream (WebODM/PyODX).
+  "ignore:datetime.datetime.utcfromtimestamp:DeprecationWarning:pyodx.types",
 ]
 addopts = "-ra --import-mode=importlib --strict-markers --strict-config --cov=avispria --cov-report=term-missing"
 

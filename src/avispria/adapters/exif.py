@@ -27,7 +27,7 @@ TAG_PIXEL_X = 40962
 TAG_PIXEL_Y = 40963
 TAG_FOCAL_35MM = 41989
 
-_TYPE_SIZES = {1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1, 9: 4, 10: 8}
+_TYPE_SIZES = {1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1, 9: 4, 10: 8, 11: 4, 12: 8}
 MAX_IFD_ENTRIES = 1000
 
 
@@ -101,10 +101,19 @@ class _Tiff:
         return list(struct.unpack(self.e + fmt * n, raw)) if fmt else []
 
     def rational(self, entry: tuple[int, int, bytes] | None) -> float | None:
-        if entry is None or entry[0] not in (5, 10) or entry[1] < 1:
+        """First value of any numeric type as a float (EXIF writers differ: DJI uses
+        RATIONAL, other software FLOAT/DOUBLE or integers)."""
+        if entry is None or entry[1] < 1:
             return None
-        num, den = struct.unpack(self.e + ("II" if entry[0] == 5 else "ii"), entry[2][:8])
-        return num / den if den else None
+        typ, _, raw = entry
+        if typ in (5, 10):
+            num, den = struct.unpack(self.e + ("II" if typ == 5 else "ii"), raw[:8])
+            return num / den if den else None
+        fmt = {3: "H", 4: "I", 9: "i", 11: "f", 12: "d"}.get(typ)
+        if fmt is None:
+            return None
+        (value,) = struct.unpack(self.e + fmt, raw[: struct.calcsize(fmt)])
+        return float(value)
 
     @staticmethod
     def text(entry: tuple[int, int, bytes] | None) -> str | None:

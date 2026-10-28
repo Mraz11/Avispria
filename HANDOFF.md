@@ -1,26 +1,26 @@
-# HANDOFF - 2026-10-28 - session #3 (capture QA)
+# HANDOFF - 2026-10-29 - session #4 (doctor, engine, processing)
 ## Done this session
-- Dependency-free EXIF (JPEG + DNG SubIFD) and DJI XMP readers; photo scanning.
-- Capture QA: GSD, footprints, neighbour overlap, view-count coverage map, blur,
-  gimbal, altitude spread, timing gaps. CLI: `qa` (+ --recursive, subfolder hints),
-  `camera-from-photo`.
-- `doctor`: RAM/swap/CPU/disk (psutil) + WebODM/NodeODX detection + job verdict
-  with alternatives; memory model = OpenDroneMap's published RAM-per-image table.
-- Lito X1 profile now from real EXIF: camera FC9589, sensor 9.692 x 7.269 mm
-  (old borrowed values understated GSD by 8%).
+- `doctor`: RAM/swap/CPU/disk + verdict with real alternatives (ODM RAM table);
+  finds the native WebODM app by its processes/ports; `--details`.
+- `engine`: finds WebODM's NodeODX, reads its token from the running command line
+  (memory only), connects via PyODX (BSD-3), lists 80 supported options.
+- `process`: photos -> QA -> engine -> feasibility -> presets (only supported options;
+  rolling-shutter for electronic shutters) -> 12 MP resize keeping EXIF+XMP -> upload ->
+  progress -> all.zip + extracted results -> provenance JSON with SHA-256s.
+- CLI split into modules (cli.py had hit the 400-line limit).
 ## Current state (command proof)
-- Windows 11 local run verified 2026-10-27: 115 passed, coverage 89.9%.
-- CI green on ubuntu/windows/macos (run #3, 2026-10-28); release v0.1.0a1.
-- This session: 134 tests pass (Linux sandbox); real-DNG test passes on founder photos.
+- 184 tests pass (Linux sandbox); founder's Windows run of `engine` connected to
+  ODX 3.8.4 (API 2.4.0), 12 cores, 16 GB, 80 options.
+- `process` NOT yet run against the real engine (needs >= 5 overlapping photos).
 ## Open problems / suspicions
-- No flight possible for ~1 month (founder near an airport).
-- Straight legs, curve dip, real photo interval still need the probe flight.
-- takePhoto encoding still unseen; interval mode remains the default.
-- Footprints assume flat ground at takeoff level; add DEM-aware footprints later.
+- Founder grounded ~1 month; test `process` with a public sample dataset.
+- Non-DJI photos: EXIF GPS fallback not implemented (QA warns, processing works).
+- PyODX uses deprecated datetime.utcfromtimestamp (narrowly ignored; report upstream).
 ## Next single task (ready-to-paste)
-Processing orchestration: drive a local WebODM/NodeODX node via PyODX from a QA'd
-photo folder (Phase 2b), with presets and the provenance bundle.
+Run `avispria process` on a public dataset on the founder's PC; fix what it shows.
 ## Decisions made
-- Coverage metric = share of the area seen by >=3 and >=5 photos.
+- Process through NodeODX directly (not WebODM's API): no login, no WebODM settings
+  touched; results importable into WebODM via its Import button.
+- Default processing resolution 12.2 MP (JPEG only; DNG sent at full size).
 ## Do-not-touch notes
-- tests/fixtures/* stay byte-exact; photo fixture holds metadata only (no images).
+- tests/fixtures/* stay byte-exact; never print or persist engine tokens.

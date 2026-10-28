@@ -31,6 +31,8 @@ dependencies = [
   "nicegui>=2.0",
   # RAM/swap/CPU detection for `avispria doctor` (BSD-3); stdlib cannot read swap portably
   "psutil>=5.9",
+  # official NodeODX client from the WebODM project (BSD-3-Clause)
+  "pyodx>=1.5.14",
 ]
 
 [project.scripts]

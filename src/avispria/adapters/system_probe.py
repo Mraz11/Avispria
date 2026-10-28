@@ -103,6 +103,56 @@ def discover_local_services() -> list[tuple[str, int, str, int]]:
     return sorted(found, key=lambda item: (item[3], item[1]))
 
 
+DEFAULT_NODE_PORT = 3000  # NodeODX default when no --port is given
+
+
+@dataclass(frozen=True)
+class LocalNode:
+    url: str
+    token: str | None  # held in memory only; never printed or stored
+    pid: int
+    odx_path: str | None
+
+
+def parse_node_cmdline(args: list[str]) -> tuple[int, str | None, str | None]:
+    """(port, token, odx_path) from a NodeODX command line (`--x v` or `--x=v`)."""
+    values: dict[str, str] = {}
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg.startswith("--"):
+            key, sep, value = arg[2:].partition("=")
+            if not sep and i + 1 < len(args) and not args[i + 1].startswith("--"):
+                value = args[i + 1]
+                i += 1
+            values[key] = value
+        i += 1
+    try:
+        port = int(values.get("port", DEFAULT_NODE_PORT))
+    except ValueError:
+        port = DEFAULT_NODE_PORT
+    return port, values.get("token") or None, values.get("odx_path") or None
+
+
+def find_local_node() -> LocalNode | None:
+    """The NodeODX engine running on this computer (e.g. started by WebODM), if any.
+
+    The token is read from the engine's own command line, which WebODM sets when it
+    starts the engine. It is kept in memory for this run only.
+    """
+    for proc in psutil.process_iter(attrs=["pid", "name"]):
+        name = str(proc.info.get("name") or "").lower()
+        if not name.startswith("nodeodx"):
+            continue
+        try:
+            cmdline = proc.cmdline()
+        except (psutil.Error, OSError):
+            continue
+        port, token, odx_path = parse_node_cmdline(cmdline[1:])
+        return LocalNode(f"http://127.0.0.1:{port}", token, int(proc.info["pid"]), odx_path)
+    return None
+
+
 def _probe_node(url: str, timeout: float) -> EngineStatus:
     status, body = _get(url, timeout)
     info = json.loads(body.decode("utf-8", "replace"))

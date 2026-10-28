@@ -321,3 +321,37 @@ def test_doctor_details(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result.exit_code == 0, result.output
     assert "webodm.exe (pid 7)  127.0.0.1:29800  ->  web page (HTTP 200)" in result.output
     assert "processing node node-odx-1: localhost:3000, online, odx 3.6.2" in result.output
+
+
+def test_engine_finds_local_node_and_never_prints_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    from avispria.adapters import system_probe
+    from fakes.nodeodx import fake_nodeodx
+
+    with fake_nodeodx("very-secret-token") as port:
+        local = system_probe.LocalNode(f"http://127.0.0.1:{port}", "very-secret-token", 4242, None)
+        monkeypatch.setattr(system_probe, "find_local_node", lambda: local)
+        result = runner.invoke(app, ["engine"])
+    assert result.exit_code == 0, result.output
+    assert "nodeodx (pid 4242)" in result.output
+    assert "Connected      odx 3.6.2 (API 2.4.0)" in result.output
+    assert "read from the running engine" in result.output
+    assert "not offered by this engine: dtm" in result.output
+    assert "very-secret-token" not in result.output
+
+
+def test_engine_reports_when_nothing_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    from avispria.adapters import system_probe
+
+    monkeypatch.setattr(system_probe, "find_local_node", lambda: None)
+    result = runner.invoke(app, ["engine"])
+    assert result.exit_code == 1 and "No processing engine is running" in result.output
+
+
+def test_engine_with_wrong_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    from fakes.nodeodx import fake_nodeodx
+
+    with fake_nodeodx("right") as port:
+        result = runner.invoke(
+            app, ["engine", "--url", f"http://127.0.0.1:{port}", "--token", "wrong"]
+        )
+    assert result.exit_code == 1 and "rejected the access token" in result.output

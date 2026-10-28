@@ -5,7 +5,7 @@
 Each submodule registers its commands on the shared Typer ``app``.
 """
 
-from avispria.app.cli import capture, doctor, files, plan  # noqa: F401  (register commands)
+from avispria.app.cli import capture, doctor, engine, files, plan  # noqa: F401  (register commands)
 from avispria.app.cli._base import app
 
 __all__ = ["app"]

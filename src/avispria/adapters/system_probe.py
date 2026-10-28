@@ -82,8 +82,16 @@ def probe_engines(
 
 
 def _reason(exc: Exception) -> str:
+    """Plain-language reason a local engine did not answer.
+
+    Linux/macOS refuse a closed local port at once; Windows retries for about two
+    seconds, so a short probe times out instead. For a local engine both mean the
+    same thing: nothing is running there.
+    """
     reason = getattr(exc, "reason", exc)
-    return "not running" if isinstance(reason, ConnectionRefusedError) else str(reason)
+    if isinstance(reason, ConnectionRefusedError | TimeoutError):
+        return "not running"
+    return str(reason)
 
 
 def docker_available() -> bool:

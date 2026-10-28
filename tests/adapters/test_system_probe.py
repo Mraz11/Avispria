@@ -55,3 +55,14 @@ def test_engines_found_and_missing(fake_node: str) -> None:
     missing = probe_engines(webodm_url=dead, node_url=dead + "info", timeout=0.5)
     assert [e.reachable for e in missing] == [False, False]
     assert missing[0].detail == "not running"
+
+
+def test_timeouts_and_refusals_both_mean_not_running() -> None:
+    import urllib.error
+
+    from avispria.adapters.system_probe import _reason
+
+    assert _reason(urllib.error.URLError(ConnectionRefusedError())) == "not running"
+    assert _reason(urllib.error.URLError(TimeoutError("timed out"))) == "not running"  # Windows
+    assert _reason(TimeoutError("timed out")) == "not running"
+    assert _reason(urllib.error.URLError("unknown host")) == "unknown host"

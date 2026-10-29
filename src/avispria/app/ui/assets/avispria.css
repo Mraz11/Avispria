@@ -1,0 +1,93 @@
+/* SPDX-FileCopyrightText: 2026 Avispria contributors */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Gives every NiceGUI/Quasar component the Avispria palette. The colours are variables defined
+   in src/avispria/app/ui/theme.py (light and dark); nothing here hard-codes a colour. */
+
+html, body, .q-layout, .q-page { background: var(--bg) !important; color: var(--text); }
+body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif; }
+a { color: var(--primary-text); }
+
+/* ---- header, footer, brand */
+.q-header {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border-bottom: 1px solid var(--border);
+  box-shadow: none !important;
+}
+.q-header::after {  /* a thin line in the logo's three colours */
+  content: "";
+  position: absolute; left: 0; right: 0; bottom: -1px; height: 3px;
+  background: linear-gradient(90deg, var(--primary), var(--highlight), var(--secondary));
+}
+.q-footer { background: var(--surface) !important; color: var(--muted) !important; border-top: 1px solid var(--border); }
+.av-brand { text-decoration: none; color: var(--text) !important; }
+.av-brand-name { font-weight: 800; font-size: 1.25rem; letter-spacing: 0.01em; }
+.av-tagline { color: var(--muted); font-size: 0.85rem; }
+.av-logo { display: block; width: 40px; height: auto; }
+.av-logo-dark { display: none; }
+:root[data-theme="dark"] .av-logo-light, body.body--dark .av-logo-light { display: none; }
+:root[data-theme="dark"] .av-logo-dark, body.body--dark .av-logo-dark { display: block; }
+.av-hero-logo { width: 112px; }
+.av-nav { color: var(--muted) !important; text-decoration: none; font-weight: 600; padding: 6px 10px; border-radius: 10px; }
+.av-nav:hover { background: var(--surface-2); color: var(--text) !important; }
+.av-nav-active { color: var(--primary-text) !important; background: var(--surface-2); box-shadow: inset 0 -3px 0 var(--primary); }
+
+/* ---- surfaces */
+.q-card, .q-expansion-item, .q-table__container {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(20, 33, 61, 0.05) !important;
+}
+.q-expansion-item .q-card { border: 0; box-shadow: none !important; }
+.q-item, .q-item__label, .q-expansion-item__container { color: var(--text) !important; }
+.q-separator { background: var(--border) !important; }
+.q-dialog__backdrop { background: rgba(20, 33, 61, 0.55) !important; }
+.q-menu, .q-tooltip { background: var(--surface) !important; color: var(--text) !important; border: 1px solid var(--border); }
+.q-table th { color: var(--muted) !important; }
+.q-table tbody td, .q-table thead tr { border-color: var(--border) !important; }
+
+/* ---- text roles */
+.av-muted { color: var(--muted) !important; }
+.av-good-text { color: var(--primary-text) !important; }
+.av-caution-text { color: var(--highlight-text) !important; }
+.av-problem-text { color: var(--secondary-text) !important; }
+
+/* ---- verdict banners and notes */
+.av-banner { border: 1px solid; border-radius: 14px; color: var(--text); }
+.av-banner.av-good { background: var(--good-bg); border-color: var(--primary); }
+.av-banner.av-caution { background: var(--caution-bg); border-color: var(--highlight); }
+.av-banner.av-problem { background: var(--problem-bg); border-color: var(--secondary); }
+.av-banner .av-good-text, .av-banner .av-caution-text, .av-banner .av-problem-text { filter: none; }
+.q-card.av-note-caution { background: var(--caution-bg) !important; border-color: var(--highlight); }
+.q-card.av-note-info { background: var(--good-bg) !important; border-color: var(--primary); }
+.av-tile-label { color: var(--muted); }
+
+/* ---- buttons: Leaf Green / Emerald for the main action, Terra Cotta for the second */
+.text-primary { color: var(--primary-text) !important; }
+.q-btn.bg-primary { background: var(--primary) !important; color: var(--on-primary) !important; }
+.q-btn.bg-negative, .q-btn.bg-secondary, .q-btn.av-btn-secondary {
+  background: var(--secondary) !important;
+  color: var(--on-secondary) !important;
+}
+.q-btn--outline.text-primary:before { border-color: var(--border-strong) !important; }
+.q-btn:focus-visible, .q-field--focused .q-field__control, a:focus-visible { outline: 3px solid var(--primary-text); outline-offset: 2px; }
+.q-btn.av-theme { color: var(--muted) !important; }
+
+/* ---- form controls */
+.q-field__native, .q-field__input, .q-field__prefix, .q-field__suffix { color: var(--text) !important; }
+.q-field__label, .q-field__bottom, .q-field__marginal { color: var(--muted) !important; }
+.q-field--outlined .q-field__control { background: var(--surface-2); }
+.q-field--outlined .q-field__control:before { border-color: var(--border-strong) !important; }
+.q-field--outlined.q-field--focused .q-field__control:after { border-color: var(--primary-text) !important; }
+.q-radio__inner, .q-checkbox__inner, .q-toggle__inner { color: var(--border-strong); }
+.q-radio__inner--truthy, .q-checkbox__inner--truthy, .q-toggle__inner--truthy { color: var(--primary-text) !important; }
+.q-linear-progress { color: var(--primary) !important; }
+.q-linear-progress__track { opacity: 0.25 !important; }
+.q-spinner { color: var(--primary-text) !important; }
+.q-notification { background: var(--surface-2) !important; color: var(--text) !important; border: 1px solid var(--border); }
+.q-notification .q-icon { color: var(--primary-text); }
+
+/* ---- the logo-coloured accent used for "next step" areas */
+.av-accent-bar { border-left: 4px solid var(--highlight); padding-left: 12px; }

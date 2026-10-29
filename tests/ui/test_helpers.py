@@ -181,3 +181,36 @@ def test_friendly_errors() -> None:
     odd = friendly_error(KeyError("boom"))
     assert odd.startswith("Something unexpected went wrong (KeyError)")
     assert friendly_error(Issue("error", "X", "y")).startswith("Something unexpected")  # type: ignore[arg-type]
+
+
+def test_charts_take_their_colours_from_the_palette() -> None:
+    from avispria.app.ui.theme import DARK, LIGHT
+
+    photos = tuple(
+        PhotoQa(f"P{i}.JPG", 500_000.0 + 30 * i, 5_700_000.0, 0.02, None, None, 0.6, None)
+        for i in range(4)
+    )
+    report = CaptureReport(photos, [], {})
+    for palette in (LIGHT, DARK):
+        chart = photo_map(report, palette)
+        assert chart["visualMap"]["inRange"]["color"] == list(palette.ramp)
+        assert chart["xAxis"]["nameTextStyle"]["color"] == palette.muted
+        assert chart["xAxis"]["splitLine"]["lineStyle"]["color"] == palette.border
+        assert chart["backgroundColor"] == "transparent"  # the card shows through
+    aoi, result = make_result()
+    for palette in (LIGHT, DARK):
+        route = route_map(
+            result, aoi, (90.4005, 23.8004), photos=[(90.4004, 23.8003)], palette=palette
+        )
+        series = {s["name"]: s for s in route["series"]}
+        assert series["Survey area"]["lineStyle"]["color"] == palette.outline
+        assert series["Mission 1"]["lineStyle"]["color"] == palette.missions[0]
+        assert series["Photos"]["itemStyle"]["color"] == palette.points
+        assert series["Takeoff"]["itemStyle"]["color"] == palette.marker
+        assert route["legend"]["textStyle"]["color"] == palette.text
+    dark_route = route_map(
+        result, aoi, (90.4005, 23.8004), photos=[(90.4004, 23.8003)], palette=DARK
+    )
+    assert {s["name"]: s for s in dark_route["series"]}["Survey area"]["lineStyle"][
+        "color"
+    ] == "#00B4D8"  # Bright Cyan

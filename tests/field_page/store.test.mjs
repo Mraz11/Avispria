@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Avispria contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { CHECKLISTS } from "../../field-page/js/checklist.js";
@@ -118,4 +119,10 @@ test("the text export reads like a notebook and skips what was left empty", () =
     text,
     "2026-10-30 08:30  Field A\nTakeoff: 23.8, 90.4 (about 5 m)\nMission: survey_01\nWind: 3 m/s\nBattery: 100% to 35%\nClear sky\n\n2026-10-30 09:00",
   );
+});
+
+
+test("the saved theme uses the same key as the script that runs before the page is painted", () => {
+  const boot = readFileSync(new URL("../../field-page/js/theme.js", import.meta.url), "utf8");
+  assert.ok(boot.includes(`"${store.KEYS.theme}"`), "js/theme.js and store.js must agree on the key");
 });

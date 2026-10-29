@@ -14,11 +14,11 @@ from typing import Any
 
 from shapely.geometry import Polygon
 
+from avispria.app.ui.theme import LIGHT, Palette
 from avispria.core.capture import CaptureReport
 from avispria.core.geometry import LocalFrame
 from avispria.core.plan_model import PlanResult
 
-MISSION_COLOURS = ("#1565c0", "#ef6c00", "#6a1b9a", "#00838f", "#ad1457", "#558b2f")
 MAX_PHOTO_DOTS = 600
 
 
@@ -34,15 +34,29 @@ def _square(xs: Sequence[float], ys: Sequence[float], pad: float = 0.08) -> dict
     }
 
 
-def _axes(box: dict[str, float]) -> dict[str, Any]:
+def _axes(box: dict[str, float], p: Palette) -> dict[str, Any]:
+    def axis(name: str, low: float, high: float) -> dict[str, Any]:
+        return {
+            "type": "value",
+            "name": name,
+            "min": low,
+            "max": high,
+            "nameTextStyle": {"color": p.muted},
+            "axisLabel": {"color": p.muted},
+            "axisLine": {"lineStyle": {"color": p.border_strong}},
+            "splitLine": {"lineStyle": {"color": p.border}},
+        }
+
     return {
-        "xAxis": {"type": "value", "name": "metres east", "min": box["xmin"], "max": box["xmax"]},
-        "yAxis": {"type": "value", "name": "metres north", "min": box["ymin"], "max": box["ymax"]},
+        "backgroundColor": "transparent",
+        "textStyle": {"color": p.text},
+        "xAxis": axis("metres east", box["xmin"], box["xmax"]),
+        "yAxis": axis("metres north", box["ymin"], box["ymax"]),
         "grid": {"left": 60, "right": 20, "top": 30, "bottom": 50},
     }
 
 
-def photo_map(report: CaptureReport) -> dict[str, Any]:
+def photo_map(report: CaptureReport, palette: Palette = LIGHT) -> dict[str, Any]:
     """Where each photo was taken, coloured by how much it overlaps its nearest neighbour."""
     photos = report.photos
     if not photos:
@@ -58,7 +72,7 @@ def photo_map(report: CaptureReport) -> dict[str, Any]:
     ]
     box = _square([v["value"][0] for v in points], [v["value"][1] for v in points])
     return {
-        **_axes(box),
+        **_axes(box, palette),
         "tooltip": {"trigger": "item"},
         "visualMap": {
             "min": 0.3,
@@ -69,7 +83,8 @@ def photo_map(report: CaptureReport) -> dict[str, Any]:
             "bottom": 0,
             "text": ["more overlap", "less"],
             "calculable": False,
-            "inRange": {"color": ["#d32f2f", "#f9a825", "#2e7d32"]},
+            "textStyle": {"color": palette.muted},
+            "inRange": {"color": list(palette.ramp)},
         },
         "series": [{"type": "scatter", "symbolSize": 11, "data": points}],
     }
@@ -80,6 +95,7 @@ def route_map(
     aoi: Polygon,
     takeoff: tuple[float, float],
     photos: Sequence[tuple[float, float]] = (),
+    palette: Palette = LIGHT,
 ) -> dict[str, Any]:
     """The survey area, each mission's route, the takeoff point and (optionally) photo spots.
 
@@ -101,7 +117,7 @@ def route_map(
             "type": "line",
             "data": outline,
             "showSymbol": False,
-            "lineStyle": {"type": "dashed", "color": "#616161", "width": 2},
+            "lineStyle": {"type": "dashed", "color": palette.outline, "width": 2},
         }
     ]
     every: list[list[float]] = list(outline)
@@ -114,7 +130,7 @@ def route_map(
                 "type": "line",
                 "data": route,
                 "showSymbol": False,
-                "lineStyle": {"width": 2, "color": MISSION_COLOURS[n % len(MISSION_COLOURS)]},
+                "lineStyle": {"width": 3, "color": palette.missions[n % len(palette.missions)]},
             }
         )
     if photos:
@@ -125,7 +141,7 @@ def route_map(
                 "type": "scatter",
                 "data": local(list(photos)[::step]),
                 "symbolSize": 4,
-                "itemStyle": {"color": "#424242", "opacity": 0.6},
+                "itemStyle": {"color": palette.points, "opacity": 0.7},
             }
         )
     series.append(
@@ -135,14 +151,18 @@ def route_map(
             "data": local([takeoff]),
             "symbol": "diamond",
             "symbolSize": 16,
-            "itemStyle": {"color": "#c62828"},
+            "itemStyle": {"color": palette.marker},
         }
     )
     every += local([takeoff])
     box = _square([p[0] for p in every], [p[1] for p in every])
     return {
-        **_axes(box),
-        "legend": {"data": [s["name"] for s in series], "bottom": 0},
+        **_axes(box, palette),
+        "legend": {
+            "data": [s["name"] for s in series],
+            "bottom": 0,
+            "textStyle": {"color": palette.text},
+        },
         "tooltip": {"trigger": "item"},
         "series": series,
     }

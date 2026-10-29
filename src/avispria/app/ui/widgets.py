@@ -11,24 +11,26 @@ from typing import Any
 from nicegui import ui
 
 from avispria.app.ui.files import list_entries, start_folder, windows_drives
+from avispria.app.ui.theme import LIGHT, Palette
+from avispria.app.ui.theme_state import current
 from avispria.app.ui.views import ExplainedIssue, StatusRow, Tile, Verdict
 
-BANNER = {
-    "good": ("bg-green-100 text-green-900", "check_circle"),
-    "caution": ("bg-amber-100 text-amber-900", "warning"),
-    "problem": ("bg-red-100 text-red-900", "error"),
+BANNER = {  # level -> (banner class, icon, icon colour class)
+    "good": ("av-good", "check_circle", "av-good-text"),
+    "caution": ("av-caution", "warning", "av-caution-text"),
+    "problem": ("av-problem", "error", "av-problem-text"),
 }
 DOT = {
-    "good": ("check_circle", "text-green-700"),
-    "caution": ("warning", "text-amber-700"),
-    "problem": ("error", "text-red-700"),
+    "good": ("check_circle", "av-good-text"),
+    "caution": ("warning", "av-caution-text"),
+    "problem": ("error", "av-problem-text"),
 }
 
 
 def verdict_banner(verdict: Verdict) -> None:
-    classes, icon = BANNER[verdict.level]
-    with ui.row().classes(f"w-full items-center gap-3 p-4 rounded-lg no-wrap {classes}"):
-        ui.icon(icon).classes("text-4xl")
+    tone, icon, icon_colour = BANNER[verdict.level]
+    with ui.row().classes(f"w-full items-center gap-3 p-4 no-wrap av-banner {tone}"):
+        ui.icon(icon).classes(f"text-4xl {icon_colour}")
         with ui.column().classes("gap-0"):
             ui.label(verdict.headline).classes("text-lg font-bold")
             if verdict.detail:
@@ -39,10 +41,10 @@ def tile_row(tiles: Sequence[Tile]) -> None:
     with ui.row().classes("w-full gap-3"):
         for tile in tiles:
             with ui.card().classes("min-w-[13rem] grow shadow-sm"):
-                ui.label(tile.label).classes("text-xs uppercase tracking-wide text-gray-500")
+                ui.label(tile.label).classes("text-xs uppercase tracking-wide av-muted")
                 ui.label(tile.value).classes("text-xl font-semibold")
                 if tile.hint:
-                    ui.label(tile.hint).classes("text-sm text-gray-600")
+                    ui.label(tile.hint).classes("text-sm av-muted")
 
 
 def status_rows(rows: Sequence[StatusRow]) -> None:
@@ -54,7 +56,7 @@ def status_rows(rows: Sequence[StatusRow]) -> None:
                 with ui.column().classes("gap-0"):
                     ui.label(f"{row.label}: {row.value}").classes("font-medium")
                     if row.hint:
-                        ui.label(row.hint).classes("text-sm text-gray-600")
+                        ui.label(row.hint).classes("text-sm av-muted")
 
 
 def issue_cards(issues: Sequence[ExplainedIssue]) -> None:
@@ -72,12 +74,28 @@ def issue_cards(issues: Sequence[ExplainedIssue]) -> None:
                 ui.label(issue.meaning)
             if issue.action:
                 ui.label("What to do: " + issue.action).classes("font-medium")
-            ui.label(f"{issue.code}: {issue.detail}").classes("text-xs text-gray-500 break-all")
+            ui.label(f"{issue.code}: {issue.detail}").classes("text-xs av-muted break-all")
 
 
-def echart(options: dict[str, Any]) -> None:
-    if options:
-        ui.echart(options).classes("w-full h-[26rem]")
+def echart(builder: Callable[[Palette], dict[str, Any]]) -> None:
+    """A chart in the page's colours; it redraws itself when light or dark mode changes."""
+    state = current()
+    options = builder(LIGHT if state is None else state.palette)
+    if not options:
+        return
+    chart = ui.echart(options).classes("w-full h-[26rem]")
+    if state is None:
+        return
+
+    def redraw(palette: Palette) -> bool:
+        if chart.is_deleted:
+            return False  # the result was cleared: stop listening
+        chart.options.clear()
+        chart.options.update(builder(palette))
+        chart.update()
+        return True
+
+    state.on_change(redraw)
 
 
 # --------------------------------------------------------- folder and file browser
@@ -88,7 +106,7 @@ async def pick_path(
     where = {"folder": start_folder(start)}
     with ui.dialog() as dialog, ui.card().classes("w-[42rem] max-w-full"):
         ui.label(title).classes("text-lg font-bold")
-        location = ui.label().classes("text-sm text-gray-600 break-all")
+        location = ui.label().classes("text-sm av-muted break-all")
         listing = ui.column().classes("w-full max-h-[22rem] overflow-auto gap-0")
         with ui.row().classes("w-full justify-between"):
             if directory:
@@ -165,7 +183,7 @@ class PathField:
                     self.input.mark(f"{marker}-input")
                     browse.mark(f"{marker}-browse")
             if hint:
-                ui.label(hint).classes("text-xs text-gray-500")
+                ui.label(hint).classes("text-xs av-muted")
 
     def _changed(self) -> None:
         if self._on_change is not None:

@@ -22,7 +22,7 @@ from avispria.core.capture import CaptureReport
 
 def _problem(box: ui.column, text: str) -> None:
     with box:
-        ui.label(text).classes("text-red-700 font-medium")
+        ui.label(text).classes("av-problem-text font-medium")
 
 
 def _show_photos_table(report: CaptureReport) -> None:
@@ -67,8 +67,8 @@ def _show_report(
             ui.label(
                 "Each dot is a photo. Its colour shows how much it overlaps its nearest "
                 "neighbour: red means thin overlap, green means plenty."
-            ).classes("text-sm text-gray-600")
-            echart(photo_map(report))
+            ).classes("text-sm av-muted")
+            echart(lambda palette: photo_map(report, palette))
         if report.issues:
             ui.label("Things to look at").classes("text-lg font-bold")
             issue_cards(explain_issues(report.issues))
@@ -78,6 +78,7 @@ def _show_report(
             ui.button(
                 "Make maps from these photos",
                 icon="map",
+                color="secondary",
                 on_click=lambda: ui.navigate.to("/process"),
             ).props("no-caps")
             ui.button(
@@ -111,7 +112,7 @@ async def check_page() -> None:
                 "instead of assuming it is flat, which makes resolution and overlap right "
                 "over hills. If it is the surface model WebODM made from these same photos "
                 "(odm_dem/dsm.tif) you can leave the takeoff point empty."
-            ).classes("text-sm text-gray-700")
+            ).classes("text-sm av-muted")
             dem = PathField(
                 "Elevation model (GeoTIFF)",
                 directory=False,
@@ -182,7 +183,7 @@ async def check_page() -> None:
 
 def _no_photos(box: ui.column, path: Path, folder: PathField, subfolders: ui.switch) -> None:
     with box:
-        ui.label(f"No photos directly in {path}").classes("font-medium text-amber-800")
+        ui.label(f"No photos directly in {path}").classes("font-medium av-caution-text")
         found = [] if subfolders.value else photo_subfolders(path)
         if not found:
             ui.label("No JPEG or DNG photos were found there.").classes("text-sm")

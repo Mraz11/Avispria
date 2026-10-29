@@ -19,9 +19,9 @@ let run = 0;
 const results = [];
 const check = async (name, fn) => { try { await fn(); results.push(["ok", name]); } catch (e) { results.push(["FAIL", name, e.message.split("\n")[0]]); } };
 
-async function load({ hash = "", seed = {}, sw = false, storage = "ok", geo = null } = {}) {
+async function load({ hash = "", seed = {}, sw = false, storage = "ok", geo = null, prefersDark = false } = {}) {
   const html = readFileSync(`${SITE}/index.html`, "utf8").replace(/<script type="module"[^>]*><\/script>/, "");
-  const dom = new JSDOM(html, { url: "https://mraz11.github.io/Avispria/" + hash, pretendToBeVisual: true });
+  const dom = new JSDOM(html, { url: "https://mraz11.github.io/Avispria/" + hash, pretendToBeVisual: true, runScripts: "outside-only" });
   const w = dom.window;
   w.scrollTo = () => {};
   for (const [k, v] of Object.entries(seed)) w.localStorage.setItem(k, v);
@@ -30,6 +30,8 @@ async function load({ hash = "", seed = {}, sw = false, storage = "ok", geo = nu
   }
   const copied = [];
   Object.defineProperty(w.navigator, "clipboard", { value: { writeText: async (t) => { copied.push(t); } }, configurable: true });
+  w.matchMedia = (query) => ({ matches: prefersDark && query.includes("dark"), media: query });
+  w.eval(readFileSync(`${SITE}/js/theme.js`, "utf8")); // the classic script that runs before the page is painted
   if (geo) Object.defineProperty(w.navigator, "geolocation", { value: geo, configurable: true });
   if (sw) Object.defineProperty(w.navigator, "serviceWorker", { value: { controller: null, register: () => Promise.resolve(), ready: Promise.resolve(), addEventListener() {} }, configurable: true });
   const def = (k, v) => Object.defineProperty(globalThis, k, { value: v, configurable: true, writable: true });
@@ -190,11 +192,12 @@ await check("Use my location fills in the takeoff point; a refusal is explained"
 
 await check("text typed into the log is shown as text, never run as HTML", async () => {
   const { d, w } = await load({ hash: "#/log" });
+  const scriptsBefore = d.querySelectorAll("script").length; // the page's own (the theme script)
   type(w, d.getElementById("l-place"), "<img src=x onerror=alert(1)>");
   type(w, d.getElementById("l-notes"), "<script>alert(2)</script>");
   click(w, button(d, "Save this flight"));
   assert.equal(d.querySelectorAll("#view-log img").length, 0);
-  assert.equal(d.querySelectorAll("script").length, 0);
+  assert.equal(d.querySelectorAll("script").length, scriptsBefore); // saving text adds none
   assert.match(text($(d, "#view-log .entry")), /<img src=x onerror=alert\(1\)>/);
 });
 
@@ -218,6 +221,40 @@ await check("About: version, offline status and the install button", async () =>
   assert.match(text($(sw.d, "#view-about")), /Version \d/);
   const link = sw.d.querySelector('#view-about a[href^="https://github.com"]');
   assert.equal(link.href, "https://github.com/Mraz11/Avispria");
+});
+
+await check("the saved choice, else the phone's setting, decides the mode before anything is drawn", async () => {
+  const theme = async (opts) => (await load(opts)).d.documentElement.getAttribute("data-theme");
+  assert.equal(await theme({}), "light");
+  assert.equal(await theme({ prefersDark: true }), "dark");
+  assert.equal(await theme({ prefersDark: true, seed: { "avispria.theme": "light" } }), "light"); // a saved choice wins
+  assert.equal(await theme({ seed: { "avispria.theme": "dark" } }), "dark");
+  assert.equal(await theme({ prefersDark: true, storage: "refused" }), "dark"); // no storage: the phone's setting
+});
+
+await check("the switch changes the mode, remembers it, and colours the browser's own bar", async () => {
+  const { d, w } = await load({ prefersDark: true });
+  const root = d.documentElement, button = d.getElementById("theme-toggle");
+  assert.equal(root.getAttribute("data-theme"), "dark"); assert.equal(button.getAttribute("aria-pressed"), "true");
+  click(w, button);
+  assert.equal(root.getAttribute("data-theme"), "light"); assert.equal(button.getAttribute("aria-pressed"), "false");
+  assert.equal(w.localStorage.getItem("avispria.theme"), "light");
+  assert.ok([...d.querySelectorAll('meta[name="theme-color"]')].every((m) => m.getAttribute("content") === "#FFFFFF"));
+  click(w, button);
+  assert.equal(root.getAttribute("data-theme"), "dark"); assert.equal(w.localStorage.getItem("avispria.theme"), "dark");
+  assert.ok([...d.querySelectorAll('meta[name="theme-color"]')].every((m) => m.getAttribute("content") === "#1F2937"));
+  const next = await load({ seed: { "avispria.theme": w.localStorage.getItem("avispria.theme") } }); // a later visit
+  assert.equal(next.d.documentElement.getAttribute("data-theme"), "dark");
+});
+
+await check("the header has the logo in both variants and the export buttons are the second colour", async () => {
+  const { d } = await load({ hash: "#/log" });
+  const logos = [...d.querySelectorAll("header img.logo")];
+  assert.deepEqual(logos.map((i) => i.getAttribute("src")), ["img/logo.png", "img/logo-dark.png"]);
+  assert.equal(logos[0].getAttribute("alt"), "Avispria logo"); assert.equal(logos[1].getAttribute("alt"), "");
+  for (const label of ["Copy all as text", "Download CSV"]) assert.ok(button(d, label).classList.contains("secondary"), label);
+  assert.ok(button(d, "Save this flight").classList.contains("primary"));
+  assert.ok(button(d, "Delete all").classList.contains("danger"));
 });
 
 for (const r of results) console.log(r[0].padEnd(5), r[1], r[2] ? `\n      -> ${r[2]}` : "");

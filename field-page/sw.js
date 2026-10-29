@@ -2,23 +2,27 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Keeps the field page working offline. The asset list and BUILD are written by
 // scripts/field_page.py: run it after changing any file of the page.
-const BUILD = "b8a12bfece3e";
+const BUILD = "32428d300cd2";
 const CACHE = `avispria-field-${BUILD}`;
 // BEGIN GENERATED ASSETS
 const ASSETS = [
   "./",
   "css/app.css",
+  "css/theme.css",
   "icons/apple-touch-icon.png",
-  "icons/favicon.svg",
+  "icons/favicon.png",
   "icons/icon-192.png",
   "icons/icon-512.png",
   "icons/icon-maskable-512.png",
+  "img/logo-dark.png",
+  "img/logo.png",
   "index.html",
   "js/app.js",
   "js/calc.js",
   "js/checklist.js",
   "js/generated.js",
   "js/store.js",
+  "js/theme.js",
   "manifest.webmanifest"
 ];
 // END GENERATED ASSETS

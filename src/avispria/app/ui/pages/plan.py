@@ -41,7 +41,7 @@ async def plan_page() -> None:
         if not outcome.ok or outcome.value is None:
             with results:
                 ui.label(outcome.error or "The plan did not finish.").classes(
-                    "text-red-700 font-medium"
+                    "av-problem-text font-medium"
                 )
             return
         STATE.last_output = form.out_dir

@@ -129,9 +129,9 @@ def test_the_offline_list_is_every_file_the_page_ships() -> None:
 def test_the_page_is_well_formed_and_loads_only_its_own_files() -> None:
     p = page()
     assert p.errors == [] and p.stack == []
-    assert [s.get("src") for s in p.scripts] == ["js/app.js"] and p.scripts[0].get(
-        "type"
-    ) == "module"
+    # the theme script runs first and is not a module (it must run before anything is painted)
+    assert [s.get("src") for s in p.scripts] == ["js/theme.js", "js/app.js"]
+    assert p.scripts[0].get("type") is None and p.scripts[1].get("type") == "module"
     assert not p.inline_script
     bad_attrs = [(t, k) for t, k in p.attrs if k == "style" or k.startswith("on")]
     assert bad_attrs == []  # no inline styles or handlers: the content policy forbids them
@@ -192,7 +192,7 @@ def test_scripts_never_build_html_from_text_or_run_text_as_code() -> None:
 def test_manifest_is_installable() -> None:
     m = json.loads((SITE / "manifest.webmanifest").read_text(encoding="utf-8"))
     assert m["display"] == "standalone" and m["start_url"] == "./" and m["scope"] == "./"
-    assert m["name"] and m["short_name"] and re.fullmatch(r"#[0-9a-f]{6}", m["theme_color"])
+    assert m["name"] and m["short_name"] and re.fullmatch(r"#[0-9a-fA-F]{6}", m["theme_color"])
     purposes = {i["purpose"] for i in m["icons"]}
     assert {"any", "maskable"} <= purposes
     for icon in m["icons"]:
@@ -245,3 +245,42 @@ def test_every_script_of_the_page_parses(script: Path) -> None:
         ["node", "--check", str(script)], capture_output=True, text=True, check=False, timeout=60
     )
     assert result.returncode == 0, result.stderr[-800:]
+
+
+def test_the_header_shows_the_logo_in_both_variants_with_a_theme_switch() -> None:
+    html = (SITE / "index.html").read_text(encoding="utf-8")
+    assert 'src="img/logo.png"' in html and 'src="img/logo-dark.png"' in html
+    assert 'alt="Avispria logo"' in html  # the visible logo says what it is; its twin is decorative
+    assert 'width="' in html and 'height="' in html  # reserved space: the page does not jump
+    assert 'id="theme-toggle"' in html and "Switch between light and dark mode" in html
+    for name in ("logo.png", "logo-dark.png"):
+        with Image.open(SITE / "img" / name) as img:
+            assert img.width == 320
+        assert (SITE / "img" / name).stat().st_size < 40_000
+
+
+def test_the_stylesheet_has_no_colours_of_its_own() -> None:
+    css = (SITE / "css" / "app.css").read_text(encoding="utf-8")
+    code = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    assert re.findall(r"#[0-9a-fA-F]{3,8}\b", code) == [], "a colour is hard-coded: use a variable"
+    # the one allowed literal is the card's barely-there shadow
+    assert re.findall(r"\b(?:rgb|hsl)a?\(", code.replace("rgba(20, 33, 61, 0.05)", "")) == []
+    for variable in (
+        "bg",
+        "surface",
+        "text",
+        "primary",
+        "secondary",
+        "on-primary",
+        "border-strong",
+    ):
+        assert f"var(--{variable})" in code, variable
+
+
+def test_the_generated_theme_carries_both_palettes_for_the_phone() -> None:
+    css = (SITE / "css" / "theme.css").read_text(encoding="utf-8")
+    assert "--bg: #FDF8F5;" in css and "--bg: #14213D;" in css  # Warm Beige, Deep Slate
+    assert '[data-theme="dark"]' in css and "prefers-color-scheme: dark" in css
+    assert "--q-" not in css  # Quasar's names are for the desktop interface only
+    js = (SITE / "js" / "theme.js").read_text(encoding="utf-8")
+    assert 'localStorage.getItem("avispria.theme")' in js and 'setAttribute("data-theme"' in js

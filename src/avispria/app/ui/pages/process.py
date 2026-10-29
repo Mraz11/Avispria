@@ -34,7 +34,7 @@ PRESET_TEXT = {
 
 def _problem(box: ui.column, text: str) -> None:
     with box:
-        ui.label(text).classes("text-red-700 font-medium")
+        ui.label(text).classes("av-problem-text font-medium")
 
 
 async def process_page() -> None:
@@ -82,12 +82,12 @@ async def process_page() -> None:
             ui.label(
                 "Smaller photos need much less memory and time, at the cost of some detail. "
                 "12 MP is the usual choice."
-            ).classes("text-xs text-gray-500")
+            ).classes("text-xs av-muted")
             force = ui.switch("Start even if this computer looks too small").mark("force-switch")
         with ui.row().classes("gap-3 items-center"):
             check_button = (
-                ui.button("Check this computer for this job", icon="memory")
-                .props("outline no-caps")
+                ui.button("Check this computer for this job", icon="memory", color="secondary")
+                .props("no-caps")
                 .mark("check-button")
             )
             start_button = (

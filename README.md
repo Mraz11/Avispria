@@ -1,3 +1,5 @@
+<p align="center"><img src="branding/logo.png" alt="Avispria logo" width="140" /></p>
+
 # Avispria
 
 **Canopy structure and change, seen from above.**
@@ -93,6 +95,19 @@ web browser, with four screens:
 
 Everything runs on your own computer and listens on `127.0.0.1` only: nothing is sent anywhere and
 nothing is reachable from the network.
+
+## Look and feel
+
+Both the window interface and the phone page share one colour system, light and dark, defined in
+`src/avispria/app/ui/theme.py`: Warm Beige and White (Deep Slate and Charcoal Blue in dark mode),
+Leaf Green / Emerald for the main actions, Terra Cotta for the second ones, Golden Yellow for
+highlights and cautions, and Bright Cyan and Neon Green for map overlays in dark mode. Where a colour
+cannot carry small text (white on Leaf Green is 3.3:1), a darker or lighter shade of the same hue is
+used, and a test measures the contrast of every pairing. Switch modes with the button in the header;
+the choice is remembered. The phone page's stylesheet is generated from the same module.
+
+The logo files are made from `branding/logo-source.jpg` by `python scripts/make_branding.py`
+(transparent cut-out, a dark-mode variant, icons). See `branding/README.md` about its licence.
 
 ## Install (Windows, PowerShell)
 

@@ -39,7 +39,7 @@ def show_feasibility(box: ui.column, report: DoctorReport) -> None:
         a, job = report.assessment, report.job
         if a is None or job is None:
             ui.label("No photos could be read in that folder.").classes(
-                "text-amber-800 font-medium"
+                "av-caution-text font-medium"
             )
             status_rows(system_rows(report))
             return
@@ -78,7 +78,7 @@ def show_result(box: ui.column, result: ProcessJobResult, out_dir: Path) -> None
                 ui.label(
                     "You can choose a smaller photo size above, or tick 'Start even if this "
                     "computer looks too small' to try anyway."
-                ).classes("text-sm text-gray-700")
+                ).classes("text-sm av-muted")
             return
         provenance = result.provenance
         verdict_banner(process_verdict(provenance))
@@ -98,22 +98,23 @@ def show_result(box: ui.column, result: ProcessJobResult, out_dir: Path) -> None
             ui.label("Your results").classes("text-lg font-bold")
             for label, path in key_outputs(provenance, out_dir):
                 with ui.row().classes("items-center gap-2 no-wrap"):
-                    ui.icon("insert_drive_file").classes("text-gray-600")
+                    ui.icon("insert_drive_file").classes("av-muted")
                     with ui.column().classes("gap-0"):
                         ui.label(label).classes("font-medium")
-                        ui.label(str(path)).classes("text-xs text-gray-500 break-all")
+                        ui.label(str(path)).classes("text-xs av-muted break-all")
             if result.outcome.zip_path is not None:
                 ui.label(
                     "To look at everything in WebODM: choose Import and select "
                     f"{result.outcome.zip_path}"
-                ).classes("text-sm text-gray-700 break-all")
-        ui.label(f"Saved in {out_dir}").classes("text-sm text-gray-600 break-all")
+                ).classes("text-sm av-muted break-all")
+        ui.label(f"Saved in {out_dir}").classes("text-sm av-muted break-all")
         with ui.row().classes("gap-3"):
             ui.button(
                 "Open the results folder",
                 icon="folder_open",
+                color="secondary",
                 on_click=lambda: open_in_file_manager(out_dir),
-            ).props("outline no-caps")
+            ).props("no-caps")
             ui.label("A record of exactly what was done is in avispria_provenance.json.").classes(
-                "text-sm text-gray-600"
+                "text-sm av-muted"
             )

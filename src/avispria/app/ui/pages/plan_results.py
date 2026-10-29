@@ -47,7 +47,7 @@ def show_plan(box: ui.column, result: PlanJobResult, out_dir: Path) -> None:
         plan = outputs.result
         verdict_banner(plan_verdict(outputs.warnings))
         if plan.summary.photo_interval_s is not None:
-            with ui.card().classes("w-full bg-blue-50"):
+            with ui.card().classes("w-full av-note-info"):
                 ui.label(
                     f"In DJI Fly, set the camera to timed shot every "
                     f"{plan.summary.photo_interval_s:.1f} seconds (or shorter) before you start."
@@ -57,9 +57,11 @@ def show_plan(box: ui.column, result: PlanJobResult, out_dir: Path) -> None:
         ui.label(
             "The dashed line is your survey area; each coloured line is one mission (one "
             "battery). The route goes a little beyond the area so the turns happen outside it."
-        ).classes("text-sm text-gray-600")
+        ).classes("text-sm av-muted")
         if result.aoi is not None:
-            echart(route_map(plan, result.aoi, result.takeoff, result.photos))
+            echart(
+                lambda palette: route_map(plan, result.aoi, result.takeoff, result.photos, palette)
+            )
         ui.label("Missions").classes("text-lg font-bold")
         columns = [
             {"name": "file", "label": "File", "field": "file", "align": "left"},
@@ -85,7 +87,10 @@ def show_plan(box: ui.column, result: PlanJobResult, out_dir: Path) -> None:
         ).classes("w-full border rounded-lg"):
             for n, step in enumerate(HOW_TO_FLY, start=1):
                 ui.label(f"{n}. {step}").classes("text-sm")
-        ui.label(f"Saved in {out_dir}").classes("text-sm text-gray-600 break-all")
+        ui.label(f"Saved in {out_dir}").classes("text-sm av-muted break-all")
         ui.button(
-            "Open the folder", icon="folder_open", on_click=lambda: open_in_file_manager(out_dir)
-        ).props("outline no-caps")
+            "Open the folder",
+            icon="folder_open",
+            color="secondary",
+            on_click=lambda: open_in_file_manager(out_dir),
+        ).props("no-caps")

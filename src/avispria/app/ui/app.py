@@ -6,8 +6,9 @@ from __future__ import annotations
 
 import socket
 
-from nicegui import ui
+from nicegui import app, ui
 
+from avispria.app.ui.layout import ASSETS
 from avispria.app.ui.pages.check import check_page
 from avispria.app.ui.pages.home import home_page
 from avispria.app.ui.pages.plan import plan_page
@@ -18,6 +19,7 @@ HOST = "127.0.0.1"  # this computer only: nothing is reachable from the network
 
 def register_pages() -> None:
     """Attach every screen to its address. Called once per run (and once per test)."""
+    app.add_static_files("/assets", ASSETS)  # the logo and the page icon
     ui.page("/")(home_page)
     ui.page("/check")(check_page)
     ui.page("/plan")(plan_page)
@@ -44,5 +46,5 @@ def run_app(port: int = 8080, open_browser: bool = True) -> None:
         show=open_browser,
         reload=False,
         title="Avispria",
-        favicon="🌿",
+        favicon=ASSETS / "favicon.png",
     )

@@ -10,19 +10,31 @@
       content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'"
     />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#2e7d32" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#101411" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1F2937" media="(prefers-color-scheme: dark)" />
     <meta name="description" content="Offline flight checklists, calculators and a flight log for drone mapping." />
     <title>Avispria Field</title>
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="icons/favicon.png" type="image/png" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <script src="js/theme.js"></script>
+    <link rel="stylesheet" href="css/theme.css" />
     <link rel="stylesheet" href="css/app.css" />
   </head>
   <body>
     <header class="top">
-      <h1>Avispria Field</h1>
-      <p>Checklists, calculators and a flight log. Works offline.</p>
+      <a class="brand" href="#/checklist">
+        <img class="logo logo-light" src="img/logo.png" width="46" height="41" alt="Avispria logo" />
+        <img class="logo logo-dark" src="img/logo-dark.png" width="46" height="41" alt="" />
+        <span>
+          <h1>Avispria Field</h1>
+          <p>Field tools that work offline</p>
+        </span>
+      </a>
+      <button id="theme-toggle" class="theme" type="button" aria-label="Switch between light and dark mode">
+        <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0-5h0l1 3h-2Zm0 20 1-3h-2ZM2 12l3-1v2Zm20 0-3-1v2ZM4.9 4.9l2.9 1.2-1.7 1.7Zm14.2 14.2-2.9-1.2 1.7-1.7ZM4.9 19.1l1.2-2.9 1.7 1.7ZM19.1 4.9l-1.2 2.9-1.7-1.7Z"/></svg>
+      </button>
     </header>
 
     <main id="view" tabindex="-1">

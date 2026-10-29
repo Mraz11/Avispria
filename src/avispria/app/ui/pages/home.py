@@ -10,7 +10,7 @@ from nicegui import ui
 
 from avispria.app.doctor import run_doctor
 from avispria.app.ui.jobs import run_job
-from avispria.app.ui.layout import frame
+from avispria.app.ui.layout import TAGLINE, frame, logo
 from avispria.app.ui.views import system_rows
 from avispria.app.ui.widgets import status_rows
 
@@ -41,17 +41,22 @@ TASKS = (
 
 async def home_page() -> None:
     with frame("Start"):
-        ui.label(
-            "Plan drone flights, check your photos and turn them into maps, all on your own "
-            "computer. Nothing is sent anywhere."
-        ).classes("text-base")
+        with ui.card().classes("w-full"), ui.row().classes("items-center gap-6 no-wrap"):
+            logo("av-hero-logo")
+            with ui.column().classes("gap-1"):
+                ui.label("Welcome to Avispria").classes("text-xl font-bold")
+                ui.label(TAGLINE).classes("av-muted")
+                ui.label(
+                    "Plan drone flights, check your photos and turn them into maps, all on your "
+                    "own computer. Nothing is sent anywhere."
+                )
         with ui.row().classes("w-full gap-4"):
             for title, text, target, icon in TASKS:
                 with ui.card().classes("min-w-[16rem] grow"):
                     with ui.row().classes("items-center gap-2"):
                         ui.icon(icon).classes("text-3xl text-primary")
                         ui.label(title).classes("text-lg font-bold")
-                    ui.label(text).classes("text-sm text-gray-700")
+                    ui.label(text).classes("text-sm av-muted")
                     ui.button("Open", on_click=lambda t=target: ui.navigate.to(t)).props(
                         "no-caps"
                     ).mark(f"open-{target.strip('/')}")
@@ -61,7 +66,7 @@ async def home_page() -> None:
             with box:
                 ui.spinner()
                 ui.label("Checking your computer...")
-        with ui.card().classes("w-full bg-amber-50"):
+        with ui.card().classes("w-full av-note-caution"):
             ui.label("Before you fly").classes("font-bold")
             ui.label(
                 "Plans and checks are aids, not guarantees. This early version has not been "
@@ -75,4 +80,4 @@ async def home_page() -> None:
         if result.ok and result.value is not None:
             status_rows(system_rows(result.value))
         else:
-            ui.label(f"Could not check this computer: {result.error}").classes("text-red-700")
+            ui.label(f"Could not check this computer: {result.error}").classes("av-problem-text")

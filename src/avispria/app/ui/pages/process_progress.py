@@ -31,7 +31,7 @@ class ProgressPanel:
             ui.label("Progress").classes("text-lg font-bold")
             self._steps = ui.column().classes("w-full gap-1")
             self._bar = ui.linear_progress(value=0, show_value=False).classes("w-full")
-            self._status = ui.label("").classes("text-sm text-gray-700")
+            self._status = ui.label("").classes("text-sm av-muted")
         self._current: ui.column | None = None
         self._header: ui.row | None = None
         self._title = ""
@@ -41,9 +41,9 @@ class ProgressPanel:
             if event.kind == "step":
                 self._start(event.text)
             elif event.kind == "info":
-                self._line(event.text, "text-sm text-gray-700")
+                self._line(event.text, "text-sm av-muted")
             elif event.kind == "warn":
-                self._line(f"Note: {event.text}", "text-sm text-amber-800")
+                self._line(f"Note: {event.text}", "text-sm av-caution-text")
             elif event.kind == "upload":
                 self._bar.set_value(event.percent / 100.0)
                 self._status.set_text(f"Sending photos to the engine: {event.percent:.0f}%")
@@ -73,7 +73,7 @@ class ProgressPanel:
         self._header.clear()
         with self._header:
             ui.icon("check_circle" if done else "cancel").classes(
-                "text-xl " + ("text-green-700" if done else "text-red-700")
+                "text-xl " + ("av-good-text" if done else "av-problem-text")
             )
             ui.label(self._title).classes("font-medium")
         self._header = None

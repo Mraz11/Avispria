@@ -111,6 +111,24 @@ def test_the_real_server_serves_every_screen(server: tuple[int, subprocess.Popen
     assert httpx.get(f"http://{HOST}:{port}/no-such-screen", timeout=10).status_code == 404
 
 
+def test_the_real_server_serves_the_logo_and_the_colours(
+    server: tuple[int, subprocess.Popen[bytes]],
+) -> None:
+    port, _ = server
+    base = f"http://{HOST}:{port}"
+    for name in ("logo.png", "logo-dark.png", "favicon.png"):
+        reply = httpx.get(f"{base}/assets/{name}", timeout=10)
+        assert reply.status_code == 200 and reply.headers["content-type"] == "image/png", name
+        assert reply.content.startswith(b"\x89PNG"), name
+    page = httpx.get(f"{base}/", timeout=10).text
+    assert (
+        "/assets/logo.png" in page and "/assets/logo-dark.png" in page
+    )  # the header logo, both modes
+    assert "data-theme" in page  # the script that picks light or dark before anything is drawn
+    assert "--primary: #2A9D8F" in page and "--primary: #2D6A4F" in page  # Leaf Green, Emerald
+    assert "--bg: #FDF8F5" in page and "--bg: #14213D" in page  # Warm Beige, Deep Slate
+
+
 def test_the_real_server_listens_on_this_computer_only(
     server: tuple[int, subprocess.Popen[bytes]],
 ) -> None:

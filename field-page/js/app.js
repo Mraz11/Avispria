@@ -74,6 +74,20 @@ async function copyText(text, done = "Copied") {
   toast(done);
 }
 
+// ---------------------------------------------------------------- light and dark mode
+// js/theme.js has already set data-theme (the saved choice, else the phone's setting) before painting.
+const SURFACE = { light: "#FFFFFF", dark: "#1F2937" }; // the header colour, for the browser's own bar
+const themeButton = document.getElementById("theme-toggle");
+const currentTheme = () => (document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light");
+function applyTheme(mode, remember) {
+  document.documentElement.setAttribute("data-theme", mode);
+  if (remember) storage.setItem(store.KEYS.theme, mode);
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => meta.setAttribute("content", SURFACE[mode]));
+  themeButton.setAttribute("aria-pressed", String(mode === "dark"));
+}
+themeButton.addEventListener("click", () => applyTheme(currentTheme() === "dark" ? "light" : "dark", true));
+applyTheme(currentTheme(), false);
+
 const fmt = (x, digits = 1) => Number(x).toFixed(digits);
 const percent = (x) => `${Math.round(x * 100)}%`;
 
@@ -337,8 +351,8 @@ function buildLog() {
     toast("Saved on this phone");
   } });
   const exportRow = h("div", { class: "actions" },
-    h("button", { type: "button", text: "Copy all as text", onclick: () => entries.length ? copyText(store.entriesToText(entries), "Log copied") : toast("The log is empty.") }),
-    h("button", { type: "button", text: "Download CSV", onclick: () => {
+    h("button", { type: "button", class: "secondary", text: "Copy all as text", onclick: () => entries.length ? copyText(store.entriesToText(entries), "Log copied") : toast("The log is empty.") }),
+    h("button", { type: "button", class: "secondary", text: "Download CSV", onclick: () => {
       if (!entries.length) return toast("The log is empty.");
       const blob = new Blob(["\ufeff" + store.entriesToCsv(entries)], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
@@ -348,7 +362,7 @@ function buildLog() {
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
     } }),
-    navigator.share ? h("button", { type: "button", text: "Share", onclick: () => entries.length && navigator.share({ title: "Avispria flight log", text: store.entriesToText(entries) }).catch(() => {}) }) : null,
+    navigator.share ? h("button", { type: "button", class: "secondary", text: "Share", onclick: () => entries.length && navigator.share({ title: "Avispria flight log", text: store.entriesToText(entries) }).catch(() => {}) }) : null,
     h("button", { type: "button", class: "danger", text: "Delete all", onclick: () => {
       if (entries.length && confirm("Delete the whole log from this phone?")) {
         entries = [];

@@ -113,7 +113,7 @@ class PlanFormUi:
                     .classes("w-40")
                     .mark("camera-select")
                 )
-            self.note = ui.label().classes("text-sm text-amber-800")
+            self.note = ui.label().classes("text-sm av-caution-text")
             self.aircraft.on_value_change(self._aircraft_changed)
             self._aircraft_changed()
             self.template = PathField(
@@ -148,7 +148,7 @@ class PlanFormUi:
             )
             with ui.row().classes("gap-3 items-center"):
                 self.target = _number("Value", 2.0, "target-input", min=0.1, max=300)
-                unit = ui.label().classes("text-sm text-gray-700")
+                unit = ui.label().classes("text-sm av-muted")
             unit.bind_text_from(
                 self.target_kind,
                 "value",
@@ -210,7 +210,7 @@ class PlanFormUi:
             ui.label(
                 "In a forest enter the typical canopy height, so the canopy (not the ground) "
                 "gets the height you asked for. Leave 0 for open ground."
-            ).classes("text-xs text-gray-500")
+            ).classes("text-xs av-muted")
 
     # ------------------------------------------------------------- 5. where to save
     def _save_card(self) -> None:

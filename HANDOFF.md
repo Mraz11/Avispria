@@ -18,6 +18,17 @@
   Warnings PL001 (typical GSD off by >15%), PL002 (coarsest tenth >30% worse), PL003.
   `--surface-height` = canopy allowance; `--no-calibrate` keeps the old behaviour.
   QA now reports front/side overlap separately (QA014: side < 50%).
+- Look and feel: ONE palette in src/avispria/app/ui/theme.py (LIGHT/DARK dataclasses, tokens_css(),
+  contrast_ratio(); tests/ui/test_theme.py measures 61 pairings). Brand colours are used as FILLS; where
+  small text is needed a derived shade is used (link green #1B766B, dark text #74C69D, etc.). NiceGUI:
+  assets/avispria.css (variables only) + ThemeState (theme_state.py) + header logo/toggle in layout.py;
+  charts take a Palette and redraw on toggle (widgets.echart(builder)); the browser announces its theme
+  via the `avispria_theme` event, the server never awaits JS replies (they hang under the simulated user).
+  Phone page: css/theme.css and js/theme.js are GENERATED from theme.py by scripts/field_page.py.
+  Logo: branding/ + scripts/make_branding.py (cut-out, dark variant, icons). LOGO LICENCE UNDECIDED
+  (branding/README.md). NOT verified: how either interface looks in a real browser (previews of the phone
+  page were rendered with WeasyPrint, approximate). Test pitfalls: never `from main import ...` in a
+  NiceGUI test (it runs ui.run); patch objects, not dotted paths, after page tests; type() appends.
 - Phone field page (field-page/, PWA, no build step, no dependencies): checklists, calculators
   (js/calc.js = port of camera.py/speed.py/sorties.py, tested against tests/field_page/golden.json
   produced by the REAL planner), flight log with geolocation + CSV, offline via sw.js. Published by

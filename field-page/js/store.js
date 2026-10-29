@@ -7,6 +7,7 @@ export const KEYS = {
   checklist: "avispria.checklist.v1",
   log: "avispria.log.v1",
   settings: "avispria.settings.v1",
+  theme: "avispria.theme", // also read by js/theme.js before the page is painted
 };
 
 /** Storage that never throws: a private-browsing phone may refuse localStorage. */

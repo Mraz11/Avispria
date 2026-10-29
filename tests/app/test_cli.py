@@ -475,3 +475,41 @@ def test_qa_shows_front_and_side_overlap(tmp_path: Path) -> None:
     result = runner.invoke(app, ["qa", str(_photo_folder(tmp_path))])
     assert result.exit_code == 0, result.output
     assert "overlap       front" in result.output and "typical," in result.output
+
+
+def test_plan_shows_what_the_photos_will_really_get(aoi: Path, dem: Path, tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    result = _plan(aoi, out, "--dem", str(dem), "--photo-mode", "waypoint")
+    assert result.exit_code == 0, result.output
+    assert "requested 50.0 m above the surface" in result.output
+    assert "Predicted over the real surface" in result.output
+    assert "resolution" in result.output and "overlap" in result.output
+    assert "coverage" in result.output and "route built around" in result.output
+    report = json.loads((out / "plan_report.json").read_text())
+    prediction = report["summary"]["prediction"]
+    assert prediction["terrain_aware"] is True and prediction["gsd_cm_median"] > 0
+    assert report["summary"]["flight_reference_m"] < 50.0  # terrain following lifts the drone
+
+
+def test_plan_surface_height_and_calibration_switch(aoi: Path, tmp_path: Path) -> None:
+    flat = _plan(aoi, tmp_path / "a", "--flat", "--photo-mode", "waypoint")
+    trees = _plan(
+        aoi, tmp_path / "b", "--flat", "--photo-mode", "waypoint", "--surface-height", "25"
+    )
+    assert flat.exit_code == 0 and trees.exit_code == 0, trees.output
+    # same typical height above the surface, but the route sits 25 m higher
+    assert "50.0 m typical" in flat.output and "50.0 m typical" in trees.output
+    from avispria.core.wpml.reader import read_mission
+
+    top = lambda d: max(  # noqa: E731
+        w.height_m for w in read_mission(next((tmp_path / d).glob("*.kmz")).read_bytes()).waypoints
+    )
+    assert top("b") - top("a") == pytest.approx(25.0, abs=0.1)
+
+
+def test_plan_no_calibrate_keeps_the_old_route(aoi: Path, dem: Path, tmp_path: Path) -> None:
+    result = _plan(aoi, tmp_path / "out", "--dem", str(dem), "--no-calibrate")
+    assert result.exit_code == 0, result.output
+    report = json.loads((tmp_path / "out" / "plan_report.json").read_text())
+    assert report["summary"]["flight_reference_m"] == pytest.approx(50.0)
+    assert report["summary"]["calibration_steps"] == 1

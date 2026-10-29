@@ -6,80 +6,27 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import replace
 
 import numpy as np
 from numpy.typing import NDArray
-from shapely.geometry import Polygon
 
-from avispria.core.camera import CameraProfile, altitude_for_gsd, gsd_m, spacing_m
+from avispria.core.camera import altitude_for_gsd, gsd_m, spacing_m
 from avispria.core.errors import PlanningError
 from avispria.core.geometry import LocalFrame
-from avispria.core.grid import Strip, auto_heading, densify_path, lawnmower
+from avispria.core.grid import auto_heading, lawnmower
 from avispria.core.mission import Mission, PhotoMode, Takeoff, Waypoint
-from avispria.core.profile import HeightProfile, TerrainOptions, flat_profile, terrain_profile
-from avispria.core.safety import Issue, SafetyLimits, check_mission
+from avispria.core.plan_model import PlanRequest, PlanResult, PlanSummary
+from avispria.core.plan_path import route_profile, strip_vertices
+from avispria.core.predict import heights_above_surface, planned_photos, predict_plan
+from avispria.core.profile import TerrainOptions
+from avispria.core.safety import Issue, check_mission
 from avispria.core.sorties import estimate_duration_s, split_by_strip
-from avispria.core.speed import SpeedSolution, solve_speed
-from avispria.core.terrain import Dem
+from avispria.core.speed import solve_speed
 
 FloatArray = NDArray[np.float64]
 
 __all__ = ["PlanRequest", "PlanResult", "PlanSummary", "PlanningError", "TerrainOptions", "plan"]
-
-
-@dataclass(frozen=True)
-class PlanRequest:
-    aoi: Polygon
-    camera: CameraProfile
-    drone_max_speed_ms: float
-    takeoff_lon: float
-    takeoff_lat: float
-    target_gsd_m: float | None = None
-    agl_m: float | None = None
-    front_overlap: float = 0.8
-    side_overlap: float = 0.7
-    heading_deg: float | None = None
-    crosshatch: bool = False
-    gimbal_pitch_deg: float = -90.0
-    photo_mode: PhotoMode = PhotoMode.WAYPOINT
-    dem: Dem | None = None
-    flat_terrain: bool = False
-    takeoff_elevation_m: float | None = None
-    terrain: TerrainOptions = field(default_factory=TerrainOptions)
-    shutter_s: float = 1 / 1000
-    wind_ms: float = 0.0
-    overrun_m: float | None = None
-    limits: SafetyLimits = field(default_factory=SafetyLimits)
-    photo_overhead_s: float = 1.0
-    climb_rate_ms: float = 3.0
-    name: str = "avispria"
-
-
-@dataclass(frozen=True)
-class PlanSummary:
-    agl_m: float
-    gsd_m: float
-    photo_spacing_m: float
-    line_spacing_m: float
-    heading_deg: float
-    strips: int
-    speed: SpeedSolution
-    photo_interval_s: float | None
-    terrain_source: str
-    takeoff_elevation_m: float | None
-    takeoff_elevation_source: str
-
-
-@dataclass(frozen=True)
-class PlanResult:
-    missions: tuple[Mission, ...]
-    summary: PlanSummary
-    issues: tuple[Issue, ...]
-
-    @property
-    def ok(self) -> bool:
-        return not any(i.level == "error" for i in self.issues)
 
 
 def _validate(req: PlanRequest) -> float:
@@ -93,6 +40,8 @@ def _validate(req: PlanRequest) -> float:
         )
     if req.dem is not None and req.flat_terrain:
         raise PlanningError("choose either a DEM or flat terrain, not both")
+    if req.surface_height_m < 0:
+        raise PlanningError("surface_height_m must not be negative")
     if req.target_gsd_m is not None:
         return altitude_for_gsd(req.camera, req.target_gsd_m)
     assert req.agl_m is not None
@@ -101,67 +50,101 @@ def _validate(req: PlanRequest) -> float:
     return req.agl_m
 
 
-def _strip_vertices(
-    strip: Strip, photo_m: float, overrun: float, mode: PhotoMode
-) -> list[tuple[float, float, bool]]:
-    """Vertices along one strip: ends (no photo) and evenly spaced photo points."""
-    if mode is PhotoMode.INTERVAL:
-        return [(strip.x0, strip.y0, False), (strip.x1, strip.y1, False)]
-    length = strip.length
-    ux, uy = (strip.x1 - strip.x0) / length, (strip.y1 - strip.y0) / length
-    inner = length - 2.0 * overrun
-    if inner <= 1e-6:
-        positions = [length / 2.0]
-    else:
-        n = max(1, math.ceil(inner / photo_m - 1e-9))
-        positions = [overrun + inner * i / n for i in range(n + 1)]
-    out: list[tuple[float, float, bool]] = []
-    if overrun > 1e-6:
-        out.append((strip.x0, strip.y0, False))
-    out += [(strip.x0 + ux * s, strip.y0 + uy * s, True) for s in positions]
-    if overrun > 1e-6:
-        out.append((strip.x1, strip.y1, False))
-    return out
-
-
-def _profile(
-    req: PlanRequest, frame: LocalFrame, path: list[tuple[float, float]], agl: float
-) -> tuple[FloatArray, FloatArray, list[int], HeightProfile]:
-    xs, ys, d, vertex_idx = densify_path(path, req.terrain.sample_step_m)
-    lons, lats = frame.to_lonlat(xs, ys)
-    if req.dem is None:
-        prof: HeightProfile = flat_profile(len(xs), vertex_idx, agl)
-    else:
-        prof = terrain_profile(
-            req.dem,
-            lons,
-            lats,
-            d,
-            vertex_idx,
-            agl,
-            (req.takeoff_lon, req.takeoff_lat),
-            req.takeoff_elevation_m,
-            req.terrain,
-        )
-    return lons, lats, vertex_idx, prof
+MAX_CALIBRATION_PASSES = 4  # in total, including the first plan
+MIN_REFERENCE_M = 5.0
+SPACING_RANGE = (0.6, 1.4)  # spacing height relative to the target height
+LOW_PERCENTILE = 10.0  # overlap is guaranteed down to this part of the lowest photos
 
 
 def plan(req: PlanRequest) -> PlanResult:
-    """Plan a survey. Raises PlanningError when no safe plan can be produced."""
+    """Plan a survey. Raises PlanningError when no safe plan can be produced.
+
+    Over terrain the route is tuned until the photos' real height above the surface matches
+    the request (see ``_calibrated``); the result carries a prediction of what it achieves.
+    """
     try:
-        return _plan(req)
+        return _calibrated(req)
     except PlanningError:
         raise
     except ValueError as exc:
         raise PlanningError(str(exc)) from exc
 
 
-def _plan(req: PlanRequest) -> PlanResult:
-    agl = _validate(req)
+def _photo_heights(result: PlanResult, req: PlanRequest) -> FloatArray | None:
+    """Real height above the surface at every planned photo (None without a model)."""
+    elevation = result.summary.takeoff_elevation_m
+    if req.dem is None or elevation is None:
+        return None
+    photos = [p for m in result.missions for p in planned_photos(m)]
+    if len(photos) < 3:
+        return None
+    heights = heights_above_surface(photos, elevation, req.dem, req.surface_height_m)
+    heights = heights[np.isfinite(heights)]
+    return heights if len(heights) >= 3 else None
+
+
+def _calibrated(req: PlanRequest) -> PlanResult:
+    target = _validate(req)
+    terrain = req.dem is not None and req.calibrate_height
+    margin = req.terrain.curve_dip_margin_m
+    # the route is never planned lower than the clearance rule allows above the dilated surface
+    lowest = max(req.limits.min_surface_clearance_m - margin, MIN_REFERENCE_M)
+    reference = max(lowest, target - margin) if terrain else target
+    spacing = target
+    passes: list[tuple[float, PlanResult, float, float]] = []  # (miss, plan, reference, spacing)
+    while True:
+        result = _plan(req, target, reference, spacing)
+        heights = _photo_heights(result, req) if terrain else None
+        if heights is None:
+            passes.append((0.0, result, reference, spacing))
+            break
+        typical = float(np.median(heights))
+        low = float(np.percentile(heights, LOW_PERCENTILE))
+        # a good pass has the typical height on target AND spacing computed for the height
+        # its lowest photos really fly at (otherwise their overlap falls short)
+        miss = (abs(typical - target) + abs(low - spacing)) / target
+        passes.append((miss, result, reference, spacing))
+        new_ref = min(max(reference + (target - typical), lowest), 2.0 * target)
+        new_spacing = min(max(low, SPACING_RANGE[0] * target), SPACING_RANGE[1] * target)
+        tolerance = max(0.02 * target, 0.5)
+        if abs(new_ref - reference) <= tolerance and abs(new_spacing - spacing) <= tolerance:
+            break
+        if len(passes) >= MAX_CALIBRATION_PASSES:
+            break
+        reference, spacing = new_ref, new_spacing
+    # the number of flight lines is a whole number, so passes do not improve monotonically:
+    # keep the most consistent one (the first of equals)
+    _, result, reference, spacing = min(passes, key=lambda item: item[0])
+
+    prediction = predict_plan(
+        result.missions,
+        req.camera,
+        req.aoi,
+        dem=req.dem,
+        takeoff_elevation_m=result.summary.takeoff_elevation_m,
+        surface_height_m=req.surface_height_m,
+        shutter_s=req.shutter_s,
+        target_gsd_cm=gsd_m(req.camera, target) * 100.0,
+    )
+    summary = replace(
+        result.summary,
+        flight_reference_m=reference,
+        spacing_height_m=spacing,
+        calibration_steps=len(passes),
+        prediction=prediction,
+    )
+    issues = (*result.issues, *(() if prediction is None else tuple(prediction.issues)))
+    return PlanResult(result.missions, summary, issues)
+
+
+def _plan(req: PlanRequest, target_m: float, reference_m: float, spacing_m_: float) -> PlanResult:
+    """One planning pass. ``reference_m`` is the height the route is built around,
+    ``spacing_m_`` the height the photo and line spacing are computed for and
+    ``target_m`` the height the user asked for (it fixes the reported resolution)."""
     cam = req.camera
     frame = LocalFrame.for_polygon(req.aoi)
     area = frame.polygon_to_local(req.aoi)
-    sp = spacing_m(cam, agl, req.front_overlap, req.side_overlap)
+    sp = spacing_m(cam, spacing_m_, req.front_overlap, req.side_overlap)
     heading = auto_heading(area) if req.heading_deg is None else req.heading_deg % 360.0
     overrun = sp.photo_m if req.overrun_m is None else req.overrun_m
     strips = lawnmower(area, heading, sp.line_m, overrun)
@@ -170,9 +153,10 @@ def _plan(req: PlanRequest) -> PlanResult:
     if not strips:
         raise PlanningError("the area is too small to fit a survey line")
 
-    ground_sample = gsd_m(cam, agl)
+    ground_sample = gsd_m(cam, target_m)
+    speed_gsd = gsd_m(cam, spacing_m_)  # the lowest photos set the motion-blur limit
     speed = solve_speed(
-        cam, ground_sample, req.shutter_s, sp.photo_m, req.drone_max_speed_ms, wind_ms=req.wind_ms
+        cam, speed_gsd, req.shutter_s, sp.photo_m, req.drone_max_speed_ms, wind_ms=req.wind_ms
     )
     # DJI Fly works in 0.1 m/s steps; round down (slower is the safe direction)
     speed = replace(speed, speed_ms=math.floor(speed.speed_ms * 10 + 1e-9) / 10)
@@ -187,14 +171,14 @@ def _plan(req: PlanRequest) -> PlanResult:
     strip_of_vertex: list[int] = []
     strip_end_vertices: list[int] = []
     for k, strip in enumerate(strips):
-        verts = _strip_vertices(strip, sp.photo_m, overrun, req.photo_mode)
+        verts = strip_vertices(strip, sp.photo_m, overrun, req.photo_mode)
         strip_end_vertices += [len(path), len(path) + len(verts) - 1]
         for x, y, photo in verts:
             path.append((x, y))
             photo_flags.append(photo)
             strip_of_vertex.append(k)
 
-    lons, lats, vertex_idx, prof = _profile(req, frame, path, agl)
+    lons, lats, vertex_idx, prof = route_profile(req, frame, path, reference_m)
     photo_at = {vertex_idx[j]: f for j, f in enumerate(photo_flags) if f}
     stop_at = {vertex_idx[j] for j in strip_end_vertices}
     strip_end = {}
@@ -261,7 +245,7 @@ def _plan(req: PlanRequest) -> PlanResult:
             issues.append(Issue(issue.level, issue.code, f"{mission.name}: {issue.message}"))
 
     summary = PlanSummary(
-        agl_m=agl,
+        agl_m=target_m,
         gsd_m=ground_sample,
         photo_spacing_m=sp.photo_m,
         line_spacing_m=sp.line_m,

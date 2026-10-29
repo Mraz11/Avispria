@@ -22,6 +22,7 @@ from avispria.core.wpml.sheet import plan_hash, spot_check_csv
 from avispria.core.wpml.template import DummyTemplate
 from avispria.core.wpml.writer import write_kmz
 
+MAX_PLAN_DEM_PX = 4096  # larger models (e.g. a 5 cm surface model) are read at reduced size
 GUID = re.compile(r"^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$")
 
 
@@ -53,6 +54,8 @@ class PlanOptions:
     limits: SafetyLimits = field(default_factory=SafetyLimits)
     terrain: TerrainOptions = field(default_factory=TerrainOptions)
     straight_lines: bool = True
+    surface_height_m: float = 0.0
+    calibrate_height: bool = True
     name: str = "avispria"
 
 
@@ -123,7 +126,8 @@ def run_plan(
     if opts.dem_path is not None:
         lons = [*aoi.exterior.xy[0], opts.takeoff_lon]
         lats = [*aoi.exterior.xy[1], opts.takeoff_lat]
-        dem = load_dem_window(opts.dem_path, (min(lons), min(lats), max(lons), max(lats)))
+        bounds = (min(lons), min(lats), max(lons), max(lats))
+        dem = load_dem_window(opts.dem_path, bounds, max_side_px=MAX_PLAN_DEM_PX)
     limits = opts.limits
     if limits.max_waypoints > profile.waypoint_limit:
         limits = SafetyLimits(**{**asdict(limits), "max_waypoints": profile.waypoint_limit})
@@ -148,6 +152,8 @@ def run_plan(
             shutter_s=opts.shutter_s,
             wind_ms=opts.wind_ms,
             limits=limits,
+            surface_height_m=opts.surface_height_m,
+            calibrate_height=opts.calibrate_height,
             name=opts.name,
         )
     )

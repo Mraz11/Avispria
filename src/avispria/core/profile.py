@@ -87,13 +87,17 @@ def terrain_profile(
     takeoff: tuple[float, float],
     takeoff_elevation_m: float | None,
     opts: TerrainOptions,
+    surface_offset_m: float = 0.0,
 ) -> HeightProfile:
-    """Follow the dilated surface at ``agl_m`` with slope limits and segment clearance."""
+    """Follow the dilated surface at ``agl_m`` with slope limits and segment clearance.
+
+    ``surface_offset_m`` is the height of trees or buildings above the (ground) model.
+    """
     lat_ref = float(np.mean(lats))
     high = filter_extreme(dem, *window_radius_px(dem, opts.dilation_radius_m, lat_ref), "max")
     low = filter_extreme(dem, *window_radius_px(dem, opts.ground_radius_m, lat_ref), "min")
     x, y = _to_dem_crs(dem, lons, lats)
-    surface = high.sample(x, y)
+    surface = high.sample(x, y) + surface_offset_m
     ground = low.sample(x, y)
     missing = np.isnan(surface) | np.isnan(ground)
     if np.any(missing):

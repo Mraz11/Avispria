@@ -1,4 +1,4 @@
-# HANDOFF - 2026-10-29 - session #4 (doctor, engine, processing, terrain-aware QA)
+# HANDOFF - 2026-10-29 - session #4 (doctor, engine, processing, terrain-aware QA and planner)
 ## Done this session
 - `doctor`: RAM/swap/CPU/disk + verdict with real alternatives (ODM RAM table);
   finds the native WebODM app by its processes/ports; `--details`.
@@ -8,6 +8,16 @@
   rolling-shutter for electronic shutters) -> 12 MP resize keeping EXIF+XMP -> upload ->
   progress -> all.zip + extracted results -> provenance JSON with SHA-256s.
 - CLI split into modules (cli.py had hit the 400-line limit).
+- Planner over terrain (core/predict.py, plan_model.py, plan_path.py): predicts the plan's real
+  resolution/overlap/coverage from the actual height above the surface at each planned photo
+  (same analyse_capture as QA, over the AOI). Terrain following used to lift the drone far above
+  the requested height (margin 10 m + dilation + slope limits): 40 m hill target 2.0 cm/px gave
+  2.73. Now a calibration loop (<=4 passes, keeps the most consistent) moves the route's
+  reference height until the MEDIAN height above surface = target, never below
+  min_surface_clearance - margin, and computes spacing for the 10th-percentile height.
+  Warnings PL001 (typical GSD off by >15%), PL002 (coarsest tenth >30% worse), PL003.
+  `--surface-height` = canopy allowance; `--no-calibrate` keeps the old behaviour.
+  QA now reports front/side overlap separately (QA014: side < 50%).
 - Terrain-aware capture QA: `core/ground.py` (height above the surface per photo; modes
   `takeoff` = DEM differences only, for any external DEM; `absolute` = photo altitude minus
   DEM, only when the DEM shares the photos' height reference, e.g. the engine's own DSM, with a
@@ -31,13 +41,18 @@
 - Non-DJI photos: EXIF GPS fallback not implemented (QA warns, processing works).
 - PyODX uses deprecated datetime.utcfromtimestamp (narrowly ignored; report upstream).
 ## Next single task (ready-to-paste)
-Canopy height/change design: needs a terrain model (leaf-off flight, external LiDAR DTM or
-open ground) - pick a public forest dataset to develop against. Alternatively feed terrain
-into the planner's overlap/spacing check. Calibrate camera size when Lito X1 data is processed.
+Founder to choose: (a) a window-based interface (NiceGUI) so researchers without a terminal can
+check, process and plan; (b) canopy height/change, which needs a terrain model (leaf-off flight,
+external LiDAR DTM or open ground) and a public forest dataset to develop against (ODM lists
+helenenschacht, 176 photos, 2.5 GB). Whenever Lito X1 data is processed: calibrate the camera
+size (gsd_ratio in provenance) and measure the route-curve dip with the probe flight.
 ## Decisions made
 - Process through NodeODX directly (not WebODM's API): no login, no WebODM settings
   touched; results importable into WebODM via its Import button.
 - Default processing resolution 12.2 MP (JPEG only; DNG sent at full size).
 - Terrain in QA uses the nadir surface point per photo (first order on steep slopes).
+- Calibration targets the typical (median) height; spacing the 10th percentile. The 10 m curve
+  margin is still unverified: when the probe flight measures the real dip, lowering it makes
+  plans fly lower/tighter automatically.
 ## Do-not-touch notes
 - tests/fixtures/* stay byte-exact; never print or persist engine tokens.

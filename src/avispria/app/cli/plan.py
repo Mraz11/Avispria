@@ -16,6 +16,7 @@ from avispria.app.workflow import PlanBlockedError, PlanOptions, run_plan
 from avispria.core.errors import PlanningError
 from avispria.core.geometry import AoiError
 from avispria.core.mission import PhotoMode
+from avispria.core.plan_model import PlanSummary
 from avispria.core.safety import SafetyLimits
 from avispria.core.wpml.kmz import KmzError
 
@@ -52,6 +53,21 @@ def plan(
         float, typer.Option(help="Usable flight time per battery (min)")
     ] = 20.0,
     curved: Annotated[bool, typer.Option(help="Keep DJI Fly's curved legs")] = False,
+    surface_height: Annotated[
+        float,
+        typer.Option(
+            help="Height of trees or buildings above the ground (m), so the canopy gets "
+            "the requested height instead of the ground"
+        ),
+    ] = 0.0,
+    calibrate: Annotated[
+        bool,
+        typer.Option(
+            "--calibrate/--no-calibrate",
+            help="Tune flight height and spacing so the photos really get the requested "
+            "height above the terrain",
+        ),
+    ] = True,
     name: str = "avispria",
 ) -> None:
     """Plan a survey and write DJI Fly mission files, spot-check sheets and a report."""
@@ -82,6 +98,8 @@ def plan(
             max_flight_time_s=max_flight_min * 60.0,
         ),
         straight_lines=not curved,
+        surface_height_m=surface_height,
+        calibrate_height=calibrate,
         name=name,
     )
     try:
@@ -97,11 +115,12 @@ def plan(
     s = res.result.summary
     typer.secho(f"Planned {len(res.kmz_paths)} mission(s) into {out}", fg=typer.colors.GREEN)
     typer.echo(
-        f"  height {s.agl_m:.1f} m above surface  GSD {s.gsd_m * 100:.2f} cm/px  "
+        f"  requested {s.agl_m:.1f} m above the surface = {s.gsd_m * 100:.2f} cm/px  "
         f"lines {s.strips} @ {s.line_spacing_m:.1f} m  photos every {s.photo_spacing_m:.1f} m"
     )
     typer.echo(f"  speed {s.speed.speed_ms:.1f} m/s (limited by {s.speed.binding})")
     typer.echo(f"  terrain: {s.terrain_source}; takeoff elevation: {s.takeoff_elevation_source}")
+    _print_prediction(s)
     if s.photo_interval_s is not None:
         typer.secho(
             f"  Set DJI Fly timed shot to {s.photo_interval_s:.1f} s or shorter before starting.",
@@ -116,3 +135,38 @@ def plan(
     if res.warnings:
         typer.secho("Warnings:", fg=typer.colors.YELLOW)
         print_issues(res.warnings)
+
+
+def _percent(value: float | None) -> str:
+    return "-" if value is None else f"{value * 100:.0f}%"
+
+
+def _print_prediction(s: PlanSummary) -> None:
+    """What the plan will really achieve over the terrain, in plain words."""
+    p = s.prediction
+    if p is None:
+        return
+    typer.secho(f"  Predicted over the real surface ({p.photos} photos):", bold=True)
+    typer.echo(
+        f"    height above the surface  {p.height_min_m:.1f} m lowest, "
+        f"{p.height_median_m:.1f} m typical, {p.height_max_m:.1f} m highest"
+    )
+    typer.echo(
+        f"    resolution                {p.gsd_cm_median:.2f} cm/px typical, "
+        f"{p.gsd_cm_p90:.2f} cm/px for the coarsest tenth"
+    )
+    if p.front_overlap_median is not None or p.side_overlap_median is not None:
+        typer.echo(
+            f"    overlap                   front {_percent(p.front_overlap_median)} typical "
+            f"({_percent(p.front_overlap_p10)} at the low end), "
+            f"side {_percent(p.side_overlap_median)} ({_percent(p.side_overlap_p10)})"
+        )
+    typer.echo(
+        f"    coverage                  {p.area_pct_min_views:.0f}% of the area seen by "
+        f"3+ photos, {p.area_pct_good_views:.0f}% by 5+"
+    )
+    if abs(s.flight_reference_m - s.agl_m) >= 2.0:
+        typer.echo(
+            f"    route built around {s.flight_reference_m:.1f} m (not {s.agl_m:.1f}): "
+            "terrain following lifts the drone above that, so this is what the photos get"
+        )

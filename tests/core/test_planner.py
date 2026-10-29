@@ -69,8 +69,8 @@ def test_flat_plan_is_constant_height_with_warning() -> None:
     assert all(buffered.contains(Point(w.lon, w.lat)) for m in res.missions for w in m.waypoints)
 
 
-def test_terrain_plan_keeps_clearance_and_climbs_over_hill() -> None:
-    res = plan(request(dem=hill_dem(), takeoff_elevation_m=10.0))
+def test_uncalibrated_terrain_plan_keeps_clearance_and_climbs_over_hill() -> None:
+    res = plan(request(dem=hill_dem(), takeoff_elevation_m=10.0, calibrate_height=False))
     assert res.ok, res.issues
     wps = [w for m in res.missions for w in m.waypoints]
     assert (

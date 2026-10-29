@@ -22,6 +22,13 @@ Read [DISCLAIMER.md](DISCLAIMER.md) before using any output near an aircraft.
   target ground resolution or height.
 - Follows terrain from a GeoTIFF DEM with a dilated safety surface, slope limits,
   a curve-dip margin, and a proof that no straight segment dips below clearance.
+- Tunes the route so the photos really get the requested height above the terrain (terrain
+  following lifts the drone, which used to leave resolution 30-55% coarser than reported),
+  and sets photo and line spacing from the lowest photos. Never below the clearance limit.
+- Predicts what each plan will achieve over the real surface before anyone flies it:
+  resolution, front and side overlap, and coverage of the survey area, with warnings.
+- `--surface-height M` tells the planner how high trees or buildings stand above the ground
+  model, so the canopy (not the ground) gets the requested height.
 - Chooses a speed from motion blur, rolling-shutter skew, photo interval and wind.
 - Splits large surveys into battery- and waypoint-limited missions.
 - Writes DJI Fly KMZ files built on **your own** DJI Fly dummy mission, then lints

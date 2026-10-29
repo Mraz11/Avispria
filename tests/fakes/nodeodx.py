@@ -85,6 +85,7 @@ class FakeState:
         self.options: list[dict[str, object]] = []
         self.uploads = 0
         self.polls = 0
+        self.cancelled = False
         self.uuid = "4f1c-test-task"
 
 
@@ -138,8 +139,10 @@ def _handler(state: FakeState) -> type[BaseHTTPRequestHandler]:
                 self._send(OPTIONS)
             elif path == f"/task/{state.uuid}/info":
                 state.polls += 1
-                done = state.polls >= 2
+                done = state.polls >= 2 and state.outcome != "hang"
                 code = 20 if not done else (40 if state.outcome == "complete" else 30)
+                if state.cancelled:
+                    done, code = True, 50
                 status: dict[str, object] = {"code": code}
                 if done and state.outcome == "fail":
                     status["errorMessage"] = "Process exited with code 1"
@@ -185,6 +188,9 @@ def _handler(state: FakeState) -> type[BaseHTTPRequestHandler]:
                 self._send({"success": True})
             elif path == f"/task/new/commit/{state.uuid}":
                 self._send({"uuid": state.uuid})
+            elif path == "/task/cancel":
+                state.cancelled = True
+                self._send({"success": True})
             else:
                 self._send({"error": "not found"})
 

@@ -23,3 +23,20 @@ def parse_latlon_text(text: str) -> tuple[float, float]:
     if not -180.0 <= lon <= 180.0:
         raise ValueError(f"Longitude {lon:g} is not between -180 and 180.")
     return lat, lon
+
+
+def parse_shutter_text(text: str) -> float:
+    """Exposure time in seconds from ``1/1000`` or ``0.001``."""
+    cleaned = text.strip()
+    hint = "Enter the shutter time like 1/1000 (or 0.001 for a thousandth of a second)"
+    try:
+        if "/" in cleaned:
+            top, _, bottom = cleaned.partition("/")
+            value = float(top) / float(bottom)
+        else:
+            value = float(cleaned)
+    except (ValueError, ZeroDivisionError):
+        raise ValueError(hint) from None
+    if value <= 0 or value > 1:
+        raise ValueError(hint)
+    return value

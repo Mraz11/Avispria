@@ -45,3 +45,24 @@ def photo_folder(tmp_path):  # type: ignore[no-untyped-def]
             altitude=60.0,
         )
     return folder
+
+
+TEMPLATE = "tests/fixtures/dji_fly_dummy/lito_x1_5wp.kmz"
+
+
+@pytest.fixture
+def plan_form(tmp_path):  # type: ignore[no-untyped-def]
+    """A valid Plan a flight form: an 80 x 120 m area near Dhaka, flat ground, Lito X1."""
+    from pathlib import Path
+
+    from avispria.app.ui.plan_job import PlanForm
+
+    template = Path(__file__).resolve().parents[2] / TEMPLATE
+    return PlanForm(
+        centre="23.8103, 90.4125",
+        width_m=80.0,
+        length_m=120.0,
+        template=str(template),
+        out_dir=str(tmp_path / "plan"),
+        target_value=2.0,
+    )

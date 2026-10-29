@@ -9,6 +9,7 @@ import json
 import re
 import shutil
 import statistics
+import threading
 import time
 import zipfile
 from collections.abc import Callable
@@ -87,6 +88,7 @@ class ProcessRequest:
     token: str | None = None
     name: str | None = None
     poll_s: float | None = None  # None: DEFAULT_POLL_S
+    cancel: threading.Event | None = None  # set it to stop a running job
 
 
 @dataclass(frozen=True)
@@ -236,7 +238,12 @@ def run_process(
         rep.step("Uploading")
         task = submit(node, to_send, opts.options, name, rep.upload)  # type: ignore[arg-type]
         rep.step("Processing")
-        outcome = wait(task, rep.progress, interval=req.poll_s or DEFAULT_POLL_S)
+        outcome = wait(
+            task,
+            rep.progress,
+            interval=req.poll_s or DEFAULT_POLL_S,
+            should_cancel=None if req.cancel is None else req.cancel.is_set,
+        )
         zip_path = results_dir = None
         outputs: list[Path] = []
         reconstruction: ReconstructionSummary | None = None

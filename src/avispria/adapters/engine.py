@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -104,20 +105,37 @@ def submit(
         raise _friendly(exc, node) from exc
 
 
+class _Cancelled(Exception):
+    """Raised inside the status callback to leave PyODX's wait loop."""
+
+
 def wait(
     task: Task,
     on_status: Callable[[float, str], None] | None = None,
     interval: float = 3.0,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> TaskOutcome:
-    """Block until the task ends; ``on_status`` gets (progress %, status name)."""
+    """Block until the task ends; ``on_status`` gets (progress %, status name).
+
+    If ``should_cancel`` returns True the engine is told to stop the task and the outcome is
+    CANCELED (checked at every status update, so within one ``interval``).
+    """
+    last = {"time": 0.0}
 
     def report(info: object) -> None:
+        last["time"] = float(getattr(info, "processing_time", 0) or 0) / 1000.0
+        if should_cancel is not None and should_cancel():
+            raise _Cancelled
         if on_status is not None:
             status = getattr(info, "status", None)
             on_status(float(getattr(info, "progress", 0) or 0), getattr(status, "name", "?"))
 
     try:
         task.wait_for_completion(status_callback=report, interval=interval)
+    except _Cancelled:
+        with contextlib.suppress(odx_errors.GenericError, OSError):
+            task.cancel()  # the engine may already be gone; the user's request stands
+        return TaskOutcome(task.uuid, False, "CANCELED", "stopped by the user", last["time"], [])
     except odx_errors.TaskFailedError:
         pass
     except (odx_errors.GenericError, OSError) as exc:

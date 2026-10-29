@@ -34,3 +34,20 @@ def test_latitude_and_longitude_are_read_flexibly(text: str) -> None:
 def test_bad_coordinates_say_what_to_do(text: str, message: str) -> None:
     with pytest.raises(ValueError, match=message):
         parse_latlon_text(text)
+
+
+@pytest.mark.parametrize(
+    ("text", "seconds"), [("1/1000", 0.001), (" 1/2000 ", 0.0005), ("0.004", 0.004), ("1/1", 1.0)]
+)
+def test_shutter_times(text: str, seconds: float) -> None:
+    from avispria.app.ui.inputs import parse_shutter_text
+
+    assert parse_shutter_text(text) == pytest.approx(seconds)
+
+
+@pytest.mark.parametrize("text", ["", "fast", "1/0", "0", "-1/1000", "5", "1/"])
+def test_bad_shutter_times(text: str) -> None:
+    from avispria.app.ui.inputs import parse_shutter_text
+
+    with pytest.raises(ValueError, match="like 1/1000"):
+        parse_shutter_text(text)

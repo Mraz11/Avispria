@@ -89,3 +89,24 @@ def test_failed_task_returns_error_and_log(tmp_path) -> None:  # type: ignore[no
     assert not outcome.completed and outcome.status == "FAILED"
     assert "exited with code 1" in outcome.error
     assert any("not enough memory" in line for line in outcome.log_tail)
+
+
+def test_cancel_stops_a_task_that_would_never_finish(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from avispria.adapters.engine import submit, wait
+    from fakes.nodeodx import fake_engine
+
+    stop = {"now": False}
+    seen: list[float] = []
+
+    def on_status(percent: float, status: str) -> None:
+        seen.append(percent)
+        stop["now"] = len(seen) >= 2  # the user presses Cancel after a couple of updates
+
+    with fake_engine("s3cret", outcome="hang") as (port, state):
+        node = connect(f"http://127.0.0.1:{port}", token="s3cret")
+        task = submit(node, _photos(tmp_path), {}, "t")
+        outcome = wait(task, on_status, interval=0.05, should_cancel=lambda: stop["now"])
+    assert state.cancelled  # the engine was told to stop
+    assert not outcome.completed and outcome.status == "CANCELED"
+    assert "stopped" in outcome.error
+    assert len(seen) == 2  # no further polling after the request

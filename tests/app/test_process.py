@@ -229,3 +229,33 @@ def test_process_without_a_surface_model_keeps_the_flat_estimate(
     assert result.exit_code == 0, result.output
     rec = json.loads((out / "avispria_provenance.json").read_text())["reconstruction"]
     assert rec["gsd_cm_flat"] is None and "using the terrain" not in result.output
+
+
+def test_a_running_job_can_be_cancelled(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import threading
+
+    from avispria.app.process_workflow import ProcessRequest, run_process
+
+    folder, out = photo_folder(tmp_path), tmp_path / "out"
+    stop = threading.Event()
+
+    class Reporter:
+        def step(self, title: str) -> None: ...
+        def info(self, text: str) -> None: ...
+        def warn(self, text: str) -> None: ...
+        def upload(self, percent: float) -> None: ...
+
+        def progress(self, percent: float, status: str) -> None:
+            stop.set()  # the user presses Cancel as soon as processing starts
+
+    with fake_engine("t", outcome="hang") as (port, state):
+        _patch(monkeypatch, port, "t")
+        outcome = run_process(
+            ProcessRequest(folder=folder, out_dir=out, preset="fast", resize_mp=None, cancel=stop),
+            Reporter(),
+        )
+        assert state.cancelled
+    assert not outcome.completed and outcome.task.status == "CANCELED"
+    assert outcome.results_dir is None and not (out / "results").exists()
+    prov = json.loads(outcome.provenance_path.read_text())
+    assert prov["status"] == "CANCELED" and prov["outputs"] == []

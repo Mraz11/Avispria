@@ -10,6 +10,7 @@ from nicegui import ui
 
 from avispria.app.ui.pages.check import check_page
 from avispria.app.ui.pages.home import home_page
+from avispria.app.ui.pages.plan import plan_page
 
 HOST = "127.0.0.1"  # this computer only: nothing is reachable from the network
 
@@ -18,6 +19,7 @@ def register_pages() -> None:
     """Attach every screen to its address. Called once per run (and once per test)."""
     ui.page("/")(home_page)
     ui.page("/check")(check_page)
+    ui.page("/plan")(plan_page)
 
 
 def find_free_port(start: int, tries: int = 20) -> int:

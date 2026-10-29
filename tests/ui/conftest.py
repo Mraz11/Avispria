@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: 2026 Avispria contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+import pytest
+
+from avispria.adapters.system_probe import EngineStatus
+from avispria.app import doctor as doctor_module
+from avispria.app.ui import state
+from avispria.core.feasibility import SystemSpec
+
+
+@pytest.fixture(autouse=True)
+def fresh_state() -> None:
+    state.reset()
+
+
+@pytest.fixture
+def fake_computer(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
+    """A computer with the given memory and (optionally) a running WebODM."""
+
+    def install(ram: float = 16.0, webodm: bool = True, disk: float = 200.0) -> None:
+        spec = SystemSpec("Windows 11", 12, ram, ram * 0.5, 4.0, disk)
+        engines = [
+            EngineStatus("WebODM", "http://127.0.0.1:29800/", webodm, "HTTP 200"),
+            EngineStatus("Processing node", "http://127.0.0.1:29301/info", webodm, "ok"),
+        ]
+        monkeypatch.setattr(doctor_module, "probe_system", lambda workdir: spec)
+        monkeypatch.setattr(doctor_module, "probe_engines", lambda: engines)
+
+    return install
+
+
+@pytest.fixture
+def photo_folder(tmp_path):  # type: ignore[no-untyped-def]
+    """Twelve small DJI-like photos in a 2 x 6 block, ~83% front and ~80% side overlap."""
+    from photobuild import make_dji_jpeg
+
+    folder = tmp_path / "flight"
+    folder.mkdir()
+    for i in range(12):
+        make_dji_jpeg(
+            folder / f"DJI_{i:04d}.JPG",
+            size=(800, 600),
+            lat=22.2820 + (i % 6) * 0.0001,
+            lon=91.7790 + (i // 6) * 0.0002,
+            altitude=60.0,
+        )
+    return folder

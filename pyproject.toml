@@ -66,6 +66,10 @@ src = ["src", "tests", "scripts"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+# a table of full sentences meant for people: long lines are clearer than chopped prose
+"src/avispria/app/ui/explain.py" = ["E501"]
+
 [tool.ruff.format]
 line-ending = "lf"
 

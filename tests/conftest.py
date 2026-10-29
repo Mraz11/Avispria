@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+pytest_plugins = ["nicegui.testing.user_plugin"]
+
 # make shared test helpers (tiffbuild) importable under importlib import mode
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -22,3 +24,9 @@ def plain_cli_output(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(rich_utils, "FORCE_TERMINAL", None)
     monkeypatch.delenv("FORCE_COLOR", raising=False)
     monkeypatch.setenv("NO_COLOR", "1")
+
+
+@pytest.fixture
+def anyio_backend() -> str:
+    """Async tests (the simulated user of the window interface) run on asyncio."""
+    return "asyncio"

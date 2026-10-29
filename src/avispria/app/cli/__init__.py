@@ -10,6 +10,7 @@ from avispria.app.cli import (  # noqa: F401  (register commands)
     doctor,
     engine,
     files,
+    gui,
     plan,
     process,
 )

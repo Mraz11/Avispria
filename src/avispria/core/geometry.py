@@ -97,3 +97,33 @@ class LocalFrame:
         if not isinstance(result, Polygon):
             raise AoiError("projection did not return a polygon")
         return result
+
+
+MAX_RECTANGLE_SIDE_M = 10_000.0
+
+
+def rectangle_polygon(
+    lat: float, lon: float, width_m: float, length_m: float, heading_deg: float = 0.0
+) -> Polygon:
+    """A survey rectangle from numbers: centre, size and direction (no map file needed).
+
+    ``length_m`` runs along ``heading_deg`` (compass degrees, 0 = north, 90 = east) and
+    ``width_m`` across it.
+    """
+    if not -90.0 <= lat <= 90.0:
+        raise AoiError(f"latitude {lat} is not between -90 and 90")
+    if not -180.0 <= lon <= 180.0:
+        raise AoiError(f"longitude {lon} is not between -180 and 180")
+    for side in (width_m, length_m):
+        if not 0.0 < side <= MAX_RECTANGLE_SIDE_M:
+            raise AoiError(f"size must be between 0 and {MAX_RECTANGLE_SIDE_M:.0f} m (got {side})")
+    frame = LocalFrame(utm_crs_for(lon, lat))
+    cx, cy = (float(v[0]) for v in frame.to_local([lon], [lat]))
+    h = math.radians(heading_deg)
+    along = (math.sin(h), math.cos(h))  # unit vector (east, north) of the long side
+    across = (math.cos(h), -math.sin(h))
+    corners = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
+    xs = [cx + a * length_m / 2 * along[0] + b * width_m / 2 * across[0] for a, b in corners]
+    ys = [cy + a * length_m / 2 * along[1] + b * width_m / 2 * across[1] for a, b in corners]
+    lons, lats = frame.to_lonlat(xs, ys)
+    return Polygon(zip(lons.tolist(), lats.tolist(), strict=True))

@@ -268,6 +268,60 @@ def stamped_service_worker(text: str, extra: dict[str, str] | None = None) -> st
     return re.sub(r'const BUILD = "[0-9a-f]{12}";', f'const BUILD = "{build_id(extra)}";', text)
 
 
+GOLDEN_REL_TOLERANCE = 1e-6  # real changes to a formula move numbers far more than this
+
+
+def golden_differences(current: str, expected: str, rel: float = GOLDEN_REL_TOLERANCE) -> list[str]:
+    """Where two golden files differ: numbers beyond ``rel``, any other value, any shape.
+
+    The planner's numbers come out of long chains of trigonometry, so another operating system
+    can differ in the last few digits; counts, names and structure must match exactly.
+    """
+    out: list[str] = []
+
+    def walk(a, b, where):  # type: ignore[no-untyped-def]
+        if isinstance(a, bool) or isinstance(b, bool) or isinstance(a, str) or isinstance(b, str):
+            if a != b:
+                out.append(f"{where}: {a!r} != {b!r}")
+        elif isinstance(a, dict) and isinstance(b, dict):
+            for key in sorted(set(a) | set(b)):
+                if key not in a or key not in b:
+                    out.append(f"{where}.{key}: missing on one side")
+                else:
+                    walk(a[key], b[key], f"{where}.{key}")
+        elif isinstance(a, list) and isinstance(b, list):
+            if len(a) != len(b):
+                out.append(f"{where}: {len(a)} items != {len(b)} items")
+            for i, (x, y) in enumerate(zip(a, b, strict=False)):
+                walk(x, y, f"{where}[{i}]")
+        elif isinstance(a, int) and isinstance(b, int):
+            if a != b:
+                out.append(f"{where}: {a} != {b}")
+        elif isinstance(a, int | float) and isinstance(b, int | float):
+            if abs(a - b) > rel * max(1.0, abs(a), abs(b)):
+                out.append(f"{where}: {a!r} != {b!r}")
+        elif a != b:
+            out.append(f"{where}: {a!r} != {b!r}")
+
+    walk(json.loads(current), json.loads(expected), "$")
+    return out
+
+
+def stale_reason(path: Path, expected: str) -> str | None:
+    """Why ``path`` is out of date (None if it is current). The golden file is compared by value."""
+    if not path.exists():
+        return "missing"
+    current = path.read_text(encoding="utf-8")
+    if path == GOLDEN:
+        diffs = golden_differences(current, expected)
+        return (
+            "; ".join(diffs[:6]) + (f" (+{len(diffs) - 6} more)" if len(diffs) > 6 else "")
+            if diffs
+            else None
+        )
+    return None if current == expected else "content differs"
+
+
 def expected_files() -> dict[Path, str]:
     """The generated files with the content they should have right now (nothing is written)."""
     generated = {"js/generated.js": cameras_js()}  # shipped, so part of the offline list and id
@@ -284,8 +338,7 @@ def main(argv: list[str]) -> int:
     check = "--check" in argv
     stale = []
     for path, text in expected_files().items():
-        current = path.read_text(encoding="utf-8") if path.exists() else None
-        if current != text:
+        if stale_reason(path, text) is not None:
             stale.append(path.relative_to(ROOT).as_posix())
             if not check:
                 path.parent.mkdir(parents=True, exist_ok=True)

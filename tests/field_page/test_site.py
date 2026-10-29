@@ -86,12 +86,34 @@ def shipped() -> list[Path]:
 
 def test_generated_files_are_current() -> None:
     gen = load_generator()
-    stale = [
-        path.relative_to(ROOT).as_posix()
+    stale = {
+        path.relative_to(ROOT).as_posix(): reason
         for path, text in gen.expected_files().items()
-        if not path.exists() or path.read_text(encoding="utf-8") != text
-    ]
-    assert stale == [], f"run `python scripts/field_page.py` (out of date: {stale})"
+        if (reason := gen.stale_reason(path, text)) is not None
+    }
+    assert stale == {}, f"run `python scripts/field_page.py` (out of date: {stale})"
+
+
+def test_golden_values_are_compared_by_value_not_by_text() -> None:
+    gen = load_generator()
+    base = json.dumps({"a": [1, 2.5, {"x": 3.0}], "name": "lito", "ok": True})
+
+    def differences(**changes: object) -> list[str]:
+        edited = json.loads(base)
+        edited.update(changes)
+        return gen.golden_differences(base, json.dumps(edited))
+
+    assert gen.golden_differences(base, base) == []
+    assert (
+        differences(a=[1, 2.5 * (1 + 1e-9), {"x": 3.0 * (1 - 1e-10)}]) == []
+    )  # another system's last digits
+    real_change = differences(a=[1, 2.5 * (1 + 1e-3), {"x": 3.0}])  # a real change
+    assert len(real_change) == 1 and real_change[0].startswith("$.a[1]: 2.5 != 2.502")
+    assert differences(a=[2, 2.5, {"x": 3.0}]) == ["$.a[0]: 1 != 2"]  # counts must match exactly
+    assert differences(name="mini") == ["$.name: 'lito' != 'mini'"]
+    assert differences(a=[1, 2.5]) == ["$.a: 3 items != 2 items"]
+    assert gen.golden_differences(base, json.dumps({"a": [], "ok": True})) != []  # missing key
+    assert gen.golden_differences(base, base.replace("true", "false")) == ["$.ok: True != False"]
 
 
 def test_the_offline_list_is_every_file_the_page_ships() -> None:

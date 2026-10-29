@@ -1,7 +1,14 @@
 # SPDX-FileCopyrightText: 2026 Avispria contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Start the real server (not a simulation) and use it the way a browser would."""
+"""Start the real server (not a simulation) and use it the way a browser would.
 
+The server is started through a small wrapper process on purpose: on Windows a virtual
+environment's python.exe is a launcher that runs the real interpreter as a child process, so
+the program that listens is never the process we started. Doing the same everywhere makes the
+tests check (and clean up) the whole process tree, as a real launch needs.
+"""
+
+import contextlib
 import os
 import subprocess
 import sys
@@ -16,6 +23,46 @@ import pytest
 from avispria.app.ui.app import HOST, find_free_port
 
 START = "from avispria.app.cli import app; app()"
+WRAPPER = (
+    "import subprocess, sys; "
+    "sys.exit(subprocess.call([sys.executable, '-c', sys.argv[1], 'ui', "
+    "'--port', sys.argv[2], '--no-browser']))"
+)
+
+
+def process_tree(pid: int) -> list[psutil.Process]:
+    try:
+        parent = psutil.Process(pid)
+        return [parent, *parent.children(recursive=True)]
+    except psutil.NoSuchProcess:
+        return []
+
+
+def stop_tree(pid: int) -> None:
+    tree = process_tree(pid)
+    for p in tree:
+        with contextlib.suppress(psutil.NoSuchProcess):
+            p.terminate()
+    _, alive = psutil.wait_procs(tree, timeout=15)
+    for p in alive:
+        with contextlib.suppress(psutil.NoSuchProcess):
+            p.kill()
+
+
+def listening_addresses(pid: int, port: int) -> set[str]:
+    """Addresses the process (or any of its children) listens on for ``port``."""
+    found: set[str] = set()
+    for p in process_tree(pid):
+        try:
+            connections = p.net_connections(kind="inet")
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+        found |= {
+            c.laddr.ip
+            for c in connections
+            if c.status == psutil.CONN_LISTEN and c.laddr.port == port
+        }
+    return found
 
 
 @pytest.fixture
@@ -25,7 +72,7 @@ def server(tmp_path: Path) -> Iterator[tuple[int, subprocess.Popen[bytes]]]:
     # environment never has it, so the program under test must not inherit it
     env = {k: v for k, v in os.environ.items() if not k.startswith(("PYTEST_", "NICEGUI_"))}
     proc = subprocess.Popen(
-        [sys.executable, "-c", START, "ui", "--port", str(port), "--no-browser"],
+        [sys.executable, "-c", WRAPPER, START, str(port)],
         cwd=tmp_path,
         env=env,
         stdout=subprocess.DEVNULL,
@@ -45,11 +92,15 @@ def server(tmp_path: Path) -> Iterator[tuple[int, subprocess.Popen[bytes]]]:
             pytest.fail("the server did not start in time")
         yield port, proc
     finally:
-        proc.terminate()
-        try:
-            proc.wait(15)
-        except subprocess.TimeoutExpired:
-            proc.kill()
+        stop_tree(proc.pid)
+        proc.wait(15)
+    # nothing may be left running: the port is free again
+    for _ in range(50):
+        if find_free_port(port, tries=1) == port:
+            break
+        time.sleep(0.1)
+    else:
+        pytest.fail(f"a server process is still running on port {port} after the test")
 
 
 def test_the_real_server_serves_every_screen(server: tuple[int, subprocess.Popen[bytes]]) -> None:
@@ -64,12 +115,8 @@ def test_the_real_server_listens_on_this_computer_only(
     server: tuple[int, subprocess.Popen[bytes]],
 ) -> None:
     port, proc = server
-    listening = [
-        c.laddr
-        for c in psutil.Process(proc.pid).net_connections(kind="inet")
-        if c.status == psutil.CONN_LISTEN and c.laddr.port == port
-    ]
-    assert listening, "the server is not listening"
-    assert {addr.ip for addr in listening} == {
-        HOST
-    }  # never 0.0.0.0: not reachable from the network
+    addresses = listening_addresses(proc.pid, port)
+    tree = [p.pid for p in process_tree(proc.pid)]
+    assert addresses, f"nothing listens on port {port} in the process tree {tree}"
+    assert addresses == {HOST}  # never 0.0.0.0: not reachable from the network
+    assert len(tree) >= 2  # the wrapper and the server: the layout a Windows launch has

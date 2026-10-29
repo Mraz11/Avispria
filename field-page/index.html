@@ -1,0 +1,54 @@
+<!doctype html>
+<!-- SPDX-FileCopyrightText: 2026 Avispria contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#2e7d32" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#101411" media="(prefers-color-scheme: dark)" />
+    <meta name="description" content="Offline flight checklists, calculators and a flight log for drone mapping." />
+    <title>Avispria Field</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="css/app.css" />
+  </head>
+  <body>
+    <header class="top">
+      <h1>Avispria Field</h1>
+      <p>Checklists, calculators and a flight log. Works offline.</p>
+    </header>
+
+    <main id="view" tabindex="-1">
+      <noscript><p class="problem">This page needs JavaScript. Please turn it on in your browser.</p></noscript>
+    </main>
+
+    <nav class="tabs" aria-label="Sections">
+      <a href="#/checklist" data-tab="checklist">
+        <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Zm-9 14-4-4 1.4-1.4L10 14.2l7.6-7.6L19 8Z"/></svg>
+        <span>Checklist</span>
+      </a>
+      <a href="#/calc" data-tab="calc">
+        <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm0 2v4h10V4Zm1.5 6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm3.5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm3.5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3ZM8.5 15a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm3.5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm3.5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/></svg>
+        <span>Calculate</span>
+      </a>
+      <a href="#/log" data-tab="log">
+        <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M6 2h11a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm1 4v2h9V6Zm0 4v2h9v-2Zm0 4v2h6v-2Z"/></svg>
+        <span>Flight log</span>
+      </a>
+      <a href="#/about" data-tab="about">
+        <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-6h2Zm0-8h-2V7h2Z"/></svg>
+        <span>About</span>
+      </a>
+    </nav>
+
+    <div id="toast" role="status" aria-live="polite" hidden></div>
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

@@ -18,6 +18,15 @@
   Warnings PL001 (typical GSD off by >15%), PL002 (coarsest tenth >30% worse), PL003.
   `--surface-height` = canopy allowance; `--no-calibrate` keeps the old behaviour.
   QA now reports front/side overlap separately (QA014: side < 50%).
+- Phone field page (field-page/, PWA, no build step, no dependencies): checklists, calculators
+  (js/calc.js = port of camera.py/speed.py/sorties.py, tested against tests/field_page/golden.json
+  produced by the REAL planner), flight log with geolocation + CSV, offline via sw.js. Published by
+  .github/workflows/pages.yml (Pages Source must be "GitHub Actions"; actions pinned: configure-pages
+  v6.0.0, upload-pages-artifact v5.0.0, deploy-pages v5.0.1). `python scripts/field_page.py` regenerates
+  js/generated.js (from drones.toml), golden.json and the sw.js asset list + BUILD id; pytest fails if stale.
+  Strict CSP (no inline script/style, no outside hosts) is tested. Node tests: tests/field_page/*.test.mjs
+  (pytest runs them if node exists; GitHub runners have it). tests/field_page/dom_check.mjs is a manual
+  developer tool (needs a scratch jsdom install; see its header). NOT verified: a real phone/browser.
 - Window interface (NiceGUI 3, local only: 127.0.0.1): `avispria ui` / Start-Avispria.bat.
   app/ui/: explain.py (plain-language text for all 49 issue codes; a test fails if a code
   lacks one), views.py + views_results.py (pure view models), charts.py (ECharts options),

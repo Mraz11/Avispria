@@ -55,6 +55,28 @@ Read [DISCLAIMER.md](DISCLAIMER.md) before using any output near an aircraft.
   measured vs estimated resolution), and writes a provenance
   record with checksums of every input and output. Presets: fast, standard, detailed.
 
+## Field page for your phone
+
+A small companion that runs in the phone's browser and keeps working with no signal:
+pre-flight, in-air and after-landing **checklists** (plus a first-test-flight list), **calculators**
+that follow the planner (resolution, spacing, speed and timed-shot interval, how long a survey takes,
+what trees do to a plan made for flat ground), and a **flight log** with "use my location" for the
+takeoff coordinates that Avispria asks for. It stores everything on the phone only, loads nothing from
+the internet and makes no network requests.
+
+Once published (below) it lives at `https://mraz11.github.io/Avispria/`. Open it on the phone, then
+Android (Chrome): menu, *Install app*; iPhone (Safari): Share, *Add to Home Screen*.
+
+To publish it: in the repository on GitHub open **Settings > Pages** and set **Source** to
+**GitHub Actions**. After that every push to `main` that touches `field-page/` updates the page
+(or run the *Field page* workflow by hand from the Actions tab).
+
+For developers: the camera numbers in `field-page/js/generated.js`, the offline file list and build id
+in `field-page/sw.js`, and `tests/field_page/golden.json` are written by `python scripts/field_page.py`
+(run it after changing the page or `drones.toml`; the tests fail if they are out of date). The page's
+JavaScript calculators are tested against values produced by the real Python planner
+(`node --test tests/field_page/*.test.mjs`, run automatically by pytest when Node is installed).
+
 ## The window interface (no terminal needed)
 
 Double-click `Start-Avispria.bat` (Windows) or run `uv run avispria ui`. Avispria opens in your

@@ -7,6 +7,7 @@ Used by `make check`, by CI, and directly:  uv run python scripts/check.py
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -14,12 +15,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PY = sys.executable
 
-STEPS: list[tuple[str, list[str]]] = [
-    ("ruff format --check", [PY, "-m", "ruff", "format", "--check", "."]),
-    ("ruff check", [PY, "-m", "ruff", "check", "."]),
-    ("mypy (core, strict)", [PY, "-m", "mypy", "src/avispria/core"]),
-    ("file length (<= 400 lines)", [PY, "scripts/check_file_length.py", "--root", "src"]),
-    ("pytest + coverage", [PY, "-m", "pytest"]),
+# What GitHub's runners set. The tests run with these everywhere, so a test that only
+# passes on a developer's PC (e.g. one that breaks when a library forces coloured output
+# on GitHub Actions) fails here first instead of after pushing.
+CI_ENV = {"GITHUB_ACTIONS": "true", "CI": "true", "PYTHONUTF8": "1"}
+
+STEPS: list[tuple[str, list[str], dict[str, str]]] = [
+    ("ruff format --check", [PY, "-m", "ruff", "format", "--check", "."], {}),
+    ("ruff check", [PY, "-m", "ruff", "check", "."], {}),
+    ("mypy (core, strict)", [PY, "-m", "mypy", "src/avispria/core"], {}),
+    ("file length (<= 400 lines)", [PY, "scripts/check_file_length.py", "--root", "src"], {}),
+    ("pytest + coverage", [PY, "-m", "pytest"], CI_ENV),
 ]
 
 
@@ -37,17 +43,17 @@ def check_context_files() -> int:
     return 0
 
 
-def run_step(name: str, cmd: list[str]) -> int:
+def run_step(name: str, cmd: list[str], env: dict[str, str] | None = None) -> int:
     print(f"\n==> {name}", flush=True)
-    return subprocess.run(cmd, cwd=ROOT, check=False).returncode
+    return subprocess.run(cmd, cwd=ROOT, check=False, env={**os.environ, **(env or {})}).returncode
 
 
 def main() -> int:
     print("==> context files identical", flush=True)
     if check_context_files() != 0:
         return 1
-    for name, cmd in STEPS:
-        code = run_step(name, cmd)
+    for name, cmd, env in STEPS:
+        code = run_step(name, cmd, env)
         if code != 0:
             print(f"\nFAILED: {name} (exit code {code})")
             return code

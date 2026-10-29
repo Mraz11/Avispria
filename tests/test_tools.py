@@ -37,3 +37,16 @@ def test_file_over_hard_limit_fails_and_is_named(tmp_path: Path) -> None:
 
 def test_missing_root_is_an_error(tmp_path: Path) -> None:
     assert _run(tmp_path / "does_not_exist").returncode == 2
+
+
+def test_the_gate_runs_tests_with_the_environment_github_sets() -> None:
+    """A test that passes only on a developer PC must fail in the local gate too."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("check_gate", SCRIPT.with_name("check.py"))
+    assert spec is not None and spec.loader is not None
+    gate = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gate)
+    pytest_env = next(env for name, _cmd, env in gate.STEPS if name.startswith("pytest"))
+    assert pytest_env["GITHUB_ACTIONS"] == "true" and pytest_env["CI"] == "true"
+    assert pytest_env["PYTHONUTF8"] == "1"

@@ -66,3 +66,22 @@ def plan_form(tmp_path):  # type: ignore[no-untyped-def]
         out_dir=str(tmp_path / "plan"),
         target_value=2.0,
     )
+
+
+@pytest.fixture
+def machine(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
+    """Make the processing screen see a computer of the given size and a fake engine."""
+    from avispria.adapters import system_probe
+    from avispria.app import process_workflow
+
+    def install(port: int, ram: float = 16.0, swap: float = 4.0) -> None:
+        pc = SystemSpec("Windows 11", 12, ram, ram * 0.5, swap, 200.0)
+        node = system_probe.LocalNode(f"http://127.0.0.1:{port}", "t", 99, None)
+        monkeypatch.setattr(process_workflow.system_probe, "find_local_node", lambda: node)
+        monkeypatch.setattr(process_workflow.system_probe, "probe_system", lambda path: pc)
+        monkeypatch.setattr(process_workflow, "DEFAULT_POLL_S", 0.05)
+        monkeypatch.setattr(doctor_module, "probe_system", lambda workdir: pc)
+        engines = [EngineStatus("WebODM", "http://127.0.0.1:29800/", True, "HTTP 200")]
+        monkeypatch.setattr(doctor_module, "probe_engines", lambda: engines)
+
+    return install

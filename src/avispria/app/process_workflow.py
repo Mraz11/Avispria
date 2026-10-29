@@ -4,8 +4,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 import shutil
 import statistics
@@ -13,7 +11,7 @@ import threading
 import time
 import zipfile
 from collections.abc import Callable
-from dataclasses import asdict, dataclass, replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol
 
@@ -30,6 +28,7 @@ from avispria.adapters.engine import (
 from avispria.adapters.photos import photo_files, scan_photos
 from avispria.adapters.resize import resize_photo
 from avispria.app.capture_workflow import camera_chooser
+from avispria.app.process_record import write_provenance
 from avispria.app.result_quality import read_stats, report_quality, summarize_result
 from avispria.core.capture import analyse_capture
 from avispria.core.feasibility import Assessment, JobSpec, SystemSpec, assess, gb
@@ -43,7 +42,6 @@ from avispria.core.processing import (
 )
 from avispria.core.quality import ReconstructionSummary
 from avispria.core.safety import Issue
-from avispria.core.version import __version__
 
 GB = 1024**3
 UPLOAD_DIR = ".avispria-upload"
@@ -98,14 +96,6 @@ class ProcessOutcome:
     zip_path: Path | None
     results_dir: Path | None
     provenance_path: Path
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _extract(zip_path: Path, dest: Path) -> list[Path]:
@@ -264,42 +254,21 @@ def run_process(
     finally:
         shutil.rmtree(upload_dir, ignore_errors=True)
 
-    provenance = {
-        "tool": {"name": "avispria", "version": __version__},
-        "started": started,
-        "finished": time.time(),
-        "status": outcome.status,
-        "error": outcome.error,
-        "log_tail": outcome.log_tail,
-        "engine": asdict(info) | {"options": sorted(info.options)},
-        "task": {"uuid": outcome.uuid, "processing_s": outcome.processing_s, "name": name},
-        "preset": req.preset,
-        "options_sent": opts.options,
-        "options_dropped": opts.dropped,
-        "resize_mp": req.resize_mp,
-        "system": asdict(system),
-        "assessment": {"verdict": assessment.verdict, "ram_gb": assessment.ram_gb},
-        "reconstruction": None
-        if reconstruction is None
-        else asdict(reconstruction)
-        | {"points_per_m2": reconstruction.points_per_m2, "gsd_ratio": reconstruction.gsd_ratio},
-        "capture_qa": {
-            "advisory": True,
-            "stats": qa.stats,
-            "issues": [asdict(i) for i in qa_issues],
-        },
-        "inputs": [
-            {"file": f.name, "bytes": f.stat().st_size, "sha256": _sha256(f)} for f in files
-        ],
-        "outputs": [
-            {
-                "file": p.relative_to(req.out_dir).as_posix(),
-                "bytes": p.stat().st_size,
-                "sha256": _sha256(p),
-            }
-            for p in outputs
-        ],
-    }
-    provenance_path = req.out_dir / "avispria_provenance.json"
-    provenance_path.write_text(json.dumps(provenance, indent=2, default=str), encoding="utf-8")
+    provenance_path = write_provenance(
+        out_dir=req.out_dir,
+        started=started,
+        name=name,
+        preset=req.preset,
+        resize_mp=req.resize_mp,
+        outcome=outcome,
+        info=info,
+        opts=opts,
+        system=system,
+        assessment=assessment,
+        reconstruction=reconstruction,
+        qa=qa,
+        qa_issues=qa_issues,
+        files=files,
+        outputs=outputs,
+    )
     return ProcessOutcome(outcome.completed, outcome, zip_path, results_dir, provenance_path)

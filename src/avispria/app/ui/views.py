@@ -132,6 +132,16 @@ def system_rows(report: DoctorReport) -> list[StatusRow]:
     return rows
 
 
+def option_lines(assessment: Assessment) -> list[str]:
+    """The alternatives for a job that does not fit, one sentence each."""
+    lines = []
+    for o in assessment.options:
+        need = "" if o.ram_gb is None else f", about {gb(o.ram_gb)} GB"
+        mark = ("works, but slow" if o.slow else "works") if o.fits else "not enough on its own"
+        lines.append(f"{o.description} ({mark}{need})")
+    return lines
+
+
 def feasibility_verdict(assessment: Assessment) -> Verdict:
     reasons = " ".join(assessment.reasons)
     if assessment.verdict == "ok":

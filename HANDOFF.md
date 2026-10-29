@@ -1,4 +1,4 @@
-# HANDOFF - 2026-10-29 - session #4 (doctor, engine, processing, terrain-aware QA and planner)
+# HANDOFF - 2026-10-30 - session #4 (doctor, engine, processing, terrain-aware QA, planner, window interface)
 ## Done this session
 - `doctor`: RAM/swap/CPU/disk + verdict with real alternatives (ODM RAM table);
   finds the native WebODM app by its processes/ports; `--details`.
@@ -18,6 +18,24 @@
   Warnings PL001 (typical GSD off by >15%), PL002 (coarsest tenth >30% worse), PL003.
   `--surface-height` = canopy allowance; `--no-calibrate` keeps the old behaviour.
   QA now reports front/side overlap separately (QA014: side < 50%).
+- Window interface (NiceGUI 3, local only: 127.0.0.1): `avispria ui` / Start-Avispria.bat.
+  app/ui/: explain.py (plain-language text for all 49 issue codes; a test fails if a code
+  lacks one), views.py + views_results.py (pure view models), charts.py (ECharts options),
+  plan_job.py / process_job.py (forms as plain data + validation + execution, tested without a
+  browser), jobs.py (background threads, QueueReporter, friendly errors), widgets.py (folder
+  browser, banners, tiles), pages/ (home, check, plan, process). Screens: Start, Check my
+  photos, Plan a flight, Make maps (progress, Cancel, results).
+  Cancel: engine.wait(should_cancel) + ProcessRequest.cancel (tested with a fake engine whose
+  task never ends). Photo size for processing is a real choice (12/8/6/4/3 MP, full).
+  Survey rectangle from numbers: core.geometry.rectangle_polygon.
+  TESTING: NiceGUI's simulated `user` runs on the AnyIO plugin (no pytest-asyncio needed);
+  main file tests/ui/ui_main.py via the nicegui_main_file marker. NiceGUI quirks: simulated
+  type() APPENDS (use clear() first: uihelpers.set_text); it cannot click ui.toggle options
+  (use ui.radio); background handlers need `eventually(...)`. tests/ui/test_server.py starts
+  the REAL server in a child process (env without PYTEST_*/NICEGUI_*, or NiceGUI enters its
+  own test mode), requests every screen and checks it listens on 127.0.0.1 only.
+  NOT verified: how it looks in a real browser, the Windows-only parts (drive buttons in the
+  folder browser, "Open the folder"), no persistent settings, prepare-copy not in the UI.
 - Terrain-aware capture QA: `core/ground.py` (height above the surface per photo; modes
   `takeoff` = DEM differences only, for any external DEM; `absolute` = photo altitude minus
   DEM, only when the DEM shares the photos' height reference, e.g. the engine's own DSM, with a
@@ -41,8 +59,8 @@
 - Non-DJI photos: EXIF GPS fallback not implemented (QA warns, processing works).
 - PyODX uses deprecated datetime.utcfromtimestamp (narrowly ignored; report upstream).
 ## Next single task (ready-to-paste)
-Founder to choose: (a) a window-based interface (NiceGUI) so researchers without a terminal can
-check, process and plan; (b) canopy height/change, which needs a terrain model (leaf-off flight,
+Founder to choose: (a) polish the window interface after real use (look, wording, prepare-copy
+for the phone, remembered folders); (b) canopy height/change, which needs a terrain model (leaf-off flight,
 external LiDAR DTM or open ground) and a public forest dataset to develop against (ODM lists
 helenenschacht, 176 photos, 2.5 GB). Whenever Lito X1 data is processed: calibrate the camera
 size (gsd_ratio in provenance) and measure the route-curve dip with the probe flight.

@@ -29,6 +29,41 @@ async def test_start_screen_explains_a_missing_engine(user: User, fake_computer)
     await user.should_see("webodm.org/download")
 
 
+@pytest.mark.parametrize(
+    ("marker", "heading", "marker_text"),
+    [
+        ("open-check", "Check my photos", "Check photos"),
+        ("open-plan", "Plan a flight", "Plan the flight"),
+        ("open-process", "Make maps", "Start making maps"),
+    ],
+)
+async def test_each_task_card_opens_its_screen(
+    user: User, fake_computer, marker: str, heading: str, marker_text: str
+) -> None:
+    fake_computer()
+    await user.open("/")
+    user.find(marker=marker).click()
+    await user.should_see(marker_text)
+    await user.should_see(heading)
+
+
+@pytest.mark.parametrize("page", ["/", "/check", "/plan", "/process"])
+async def test_every_screen_has_the_same_header_and_footer(
+    user: User, fake_computer, page: str
+) -> None:
+    fake_computer()
+    await user.open(page)
+    for text in (
+        "Avispria",
+        "Start",
+        "Check my photos",
+        "Plan a flight",
+        "Make maps",
+        "not yet flight-tested",
+    ):
+        await user.should_see(text)
+
+
 def test_finding_a_free_port_skips_busy_ones() -> None:
     with socket.socket() as busy:
         busy.bind((HOST, 0))

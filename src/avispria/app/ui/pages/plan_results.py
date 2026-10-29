@@ -15,6 +15,13 @@ from avispria.app.ui.views import Verdict, explain_issues
 from avispria.app.ui.views_results import plan_tiles, plan_verdict
 from avispria.app.ui.widgets import echart, issue_cards, tile_row, verdict_banner
 
+FLY_FILE_HELP = (
+    "On your phone, open DJI Fly, choose Waypoint Flight, add two points and save the mission "
+    "(do not fly it). Then copy the .kmz file DJI Fly made for it to this computer: "
+    "Android/data/dji.go.v5/files/waypoint/<long ID>/<long ID>.kmz. Avispria copies the exact "
+    "format your DJI Fly uses from this file."
+)
+
 HOW_TO_FLY = (
     "Open DJI Fly, choose Waypoint Flight, add two points and save the mission. This creates "
     "a mission folder on your phone.",

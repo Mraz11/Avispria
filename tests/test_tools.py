@@ -50,3 +50,10 @@ def test_the_gate_runs_tests_with_the_environment_github_sets() -> None:
     pytest_env = next(env for name, _cmd, env in gate.STEPS if name.startswith("pytest"))
     assert pytest_env["GITHUB_ACTIONS"] == "true" and pytest_env["CI"] == "true"
     assert pytest_env["PYTHONUTF8"] == "1"
+
+
+def test_the_windows_launcher_starts_the_interface_and_explains_a_missing_uv() -> None:
+    launcher = (Path(__file__).resolve().parent.parent / "Start-Avispria.bat").read_text()
+    assert "uv run avispria ui" in launcher
+    assert "docs.astral.sh/uv" in launcher  # tells the user what to install if uv is missing
+    assert 'cd /d "%~dp0"' in launcher  # works wherever the folder is, and from a double-click

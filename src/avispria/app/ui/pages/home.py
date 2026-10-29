@@ -52,7 +52,9 @@ async def home_page() -> None:
                         ui.icon(icon).classes("text-3xl text-primary")
                         ui.label(title).classes("text-lg font-bold")
                     ui.label(text).classes("text-sm text-gray-700")
-                    ui.button("Open", on_click=lambda t=target: ui.navigate.to(t)).props("no-caps")
+                    ui.button("Open", on_click=lambda t=target: ui.navigate.to(t)).props(
+                        "no-caps"
+                    ).mark(f"open-{target.strip('/')}")
         with ui.card().classes("w-full"):
             ui.label("Your computer").classes("text-lg font-bold")
             box = ui.column().classes("w-full")

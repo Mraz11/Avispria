@@ -55,6 +55,23 @@ Read [DISCLAIMER.md](DISCLAIMER.md) before using any output near an aircraft.
   measured vs estimated resolution), and writes a provenance
   record with checksums of every input and output. Presets: fast, standard, detailed.
 
+## The window interface (no terminal needed)
+
+Double-click `Start-Avispria.bat` (Windows) or run `uv run avispria ui`. Avispria opens in your
+web browser, with four screens:
+
+- **Start**: what your computer can do, whether WebODM is running, and where to go.
+- **Check my photos**: a verdict, the key numbers, a map of where each photo was taken, and every
+  warning explained in plain words ("what it means" and "what to do").
+- **Plan a flight**: describe the survey area (by numbers or a map file), your drone and what you
+  want; get DJI Fly missions, the route on a map, and a prediction of the resolution and overlap
+  you will really get.
+- **Make maps**: pick the photos and a quality level, see your computer's capacity, follow the
+  progress, cancel if needed, and get the orthophoto, surface model and point cloud.
+
+Everything runs on your own computer and listens on `127.0.0.1` only: nothing is sent anywhere and
+nothing is reachable from the network.
+
 ## Install (Windows, PowerShell)
 
     powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"

@@ -149,3 +149,51 @@ def test_exif_numeric_types_from_other_software() -> None:
         }
         e = read_exif(build_tiff(ifds, ["ifd0", "exif"]))
         assert e.focal_mm == pytest.approx(float(focal_entry[2]))
+
+
+def test_exif_gps_fallback_for_older_dji_firmware(tmp_path: Path) -> None:
+    """Phantom 3 era photos: DJI XMP has altitude and gimbal but GPS only in EXIF."""
+    gps_ifd = [
+        (1, 2, "N"),
+        (2, 5, [(46, 1), (50, 1), (3339, 100)]),
+        (3, 2, "W"),
+        (4, 5, [(91, 1), (59, 1), (4042, 100)]),
+        (6, 5, [(19831, 100)]),
+    ]
+    xmp = dji_xmp(RelativeAltitude="+39.80", GimbalPitchDegree="-89.90", GimbalYawDegree="+45.00")
+    ifds = {
+        "ifd0": [
+            (271, 2, "DJI"),
+            (272, 2, "FC300S"),
+            (34665, IFD_POINTER, "exif"),
+            (34853, IFD_POINTER, "gps"),
+        ],
+        "exif": [(37386, 5, [(36, 10)]), (41989, 3, 20), (40962, 4, 4000), (40963, 4, 2250)],
+        "gps": gps_ifd,
+    }
+    e = read_exif(jpeg_with(build_tiff(ifds, ["ifd0", "exif", "gps"]), xmp))
+    assert e.gps_lat == pytest.approx(46 + 50 / 60 + 33.39 / 3600)
+    assert e.gps_lon == pytest.approx(-(91 + 59 / 60 + 40.42 / 3600))
+    assert e.gps_alt_m == pytest.approx(198.31)
+    path = tmp_path / "DJI_0018.JPG"
+    path.write_bytes(jpeg_with(build_tiff(ifds, ["ifd0", "exif", "gps"]), xmp))
+    r = read_photo(path)
+    assert r.lat == pytest.approx(46.842608, abs=1e-6) and r.lon == pytest.approx(
+        -91.994561, abs=1e-6
+    )
+    assert r.relative_altitude_m == pytest.approx(39.8)
+
+
+def test_xmp_position_wins_over_exif() -> None:
+    e = read_exif(jpeg_bytes())
+    assert e.gps_lat is None  # the synthetic photo has no EXIF GPS block
+
+
+def test_date_only_xmp_falls_back_to_exif_time() -> None:
+    from avispria.adapters.photos import _time
+
+    assert _time({"CreateDate": "2016-06-23"}, "2016:06:23 16:31:59") == datetime(
+        2016, 6, 23, 16, 31, 59
+    )
+    with_tz = _time({"CreateDate": "2026-10-24T12:04:56+06:00"}, "2026:10:24 12:04:56")
+    assert with_tz is not None and with_tz.utcoffset() == timedelta(hours=6)

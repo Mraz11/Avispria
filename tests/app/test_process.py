@@ -100,3 +100,33 @@ def test_process_needs_five_photos(tmp_path: Path) -> None:
 def test_unknown_preset(tmp_path: Path) -> None:
     result = _run(photo_folder(tmp_path), tmp_path / "out", "--preset", "maximum")
     assert result.exit_code == 2 and "unknown preset" in result.output
+
+
+def test_task_name_skips_generic_folders(tmp_path: Path) -> None:
+    from avispria.app.process_workflow import task_name
+
+    (tmp_path / "brighton" / "images").mkdir(parents=True)
+    (tmp_path / "site1" / "DCIM" / "100MEDIA").mkdir(parents=True)
+    assert task_name(tmp_path / "brighton" / "images") == "brighton"
+    assert task_name(tmp_path / "site1" / "DCIM" / "100MEDIA") == "site1"
+    assert task_name(tmp_path / "brighton") == "brighton"
+
+
+def test_qa_that_cannot_assess_is_only_a_warning(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    folder = tmp_path / "plain" / "images"
+    folder.mkdir(parents=True)
+    from PIL import Image
+
+    for i in range(6):  # photos without any position metadata
+        Image.new("RGB", (400, 300)).save(folder / f"IMG_{i}.JPG", "JPEG")
+    out = tmp_path / "out"
+    with fake_engine("t") as (port, _):
+        _patch(monkeypatch, port, "t")
+        result = _run(folder, out)
+    assert result.exit_code == 0, result.output
+    prov = json.loads((out / "avispria_provenance.json").read_text())
+    assert prov["capture_qa"]["advisory"] is True
+    assert {i["level"] for i in prov["capture_qa"]["issues"]} == {"warning"}
+    assert (out / "plain_all.zip").exists()

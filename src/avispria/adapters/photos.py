@@ -28,9 +28,13 @@ def _num(values: dict[str, str], key: str) -> float | None:
     return value if math.isfinite(value) else None
 
 
+def _first_of(*values: float | None) -> float | None:
+    return next((v for v in values if v is not None), None)
+
+
 def _time(xmp: dict[str, str], exif_time: str | None) -> datetime | None:
     raw = xmp.get("CreateDate")
-    if raw:
+    if raw and "T" in raw:  # older DJI firmware writes a date without a time: use EXIF
         try:
             return datetime.fromisoformat(raw)
         except ValueError:
@@ -60,8 +64,8 @@ def read_photo(path: Path) -> PhotoRecord:
     return PhotoRecord(
         name=path.name,
         time=_time(xmp, exif.datetime_original),
-        lat=_num(xmp, "GpsLatitude"),
-        lon=_num(xmp, "GpsLongitude"),
+        lat=_first_of(_num(xmp, "GpsLatitude"), exif.gps_lat),  # DJI XMP, else EXIF GPS
+        lon=_first_of(_num(xmp, "GpsLongitude"), exif.gps_lon),
         relative_altitude_m=_num(xmp, "RelativeAltitude"),
         gimbal_pitch_deg=_num(xmp, "GimbalPitchDegree"),
         gimbal_yaw_deg=_num(xmp, "GimbalYawDegree"),

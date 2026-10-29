@@ -6,12 +6,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import statistics
 import time
 import zipfile
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Protocol
 
@@ -43,6 +44,16 @@ from avispria.core.version import __version__
 GB = 1024**3
 UPLOAD_DIR = ".avispria-upload"
 DEFAULT_POLL_S = 3.0
+GENERIC_FOLDER = re.compile(r"^(images?|photos?|pictures?|imgs?|dcim|\d{3}media)$", re.IGNORECASE)
+
+
+def task_name(folder: Path) -> str:
+    """Folder name, or its parent's when the folder has a generic name like 'images'."""
+    path = folder.resolve()
+    for part in (path, *path.parents):
+        if part.name and not GENERIC_FOLDER.match(part.name):
+            return part.name
+    return "avispria"
 
 
 class Reporter(Protocol):
@@ -138,7 +149,7 @@ def run_process(
     probe = probe or system_probe.probe_system
     find_node = find_node or system_probe.find_local_node
     started = time.time()
-    name = req.name or req.folder.resolve().name or "avispria"
+    name = req.name or task_name(req.folder)
 
     rep.step("Photos")
     files = photo_files(req.folder, recursive=req.recursive)
@@ -160,7 +171,9 @@ def run_process(
             f"GSD {qa.stats['gsd_cm_median']:.2f} cm/px, "
             f"{qa.stats['area_pct_min_views']:.0f}% of the area seen by 3+ photos"
         )
-    for issue in [*qa.issues, *notes]:
+    # QA is advisory here: an assessment that could not be made is a warning, not an error
+    qa_issues = [replace(i, level="warning") for i in [*qa.issues, *notes]]
+    for issue in qa_issues:
         rep.warn(f"{issue.code}: {issue.message}")
 
     rep.step("Processing engine")
@@ -239,7 +252,11 @@ def run_process(
         "resize_mp": req.resize_mp,
         "system": asdict(system),
         "assessment": {"verdict": assessment.verdict, "ram_gb": assessment.ram_gb},
-        "capture_qa": {"stats": qa.stats, "issues": [asdict(i) for i in qa.issues]},
+        "capture_qa": {
+            "advisory": True,
+            "stats": qa.stats,
+            "issues": [asdict(i) for i in qa_issues],
+        },
         "inputs": [
             {"file": f.name, "bytes": f.stat().st_size, "sha256": _sha256(f)} for f in files
         ],

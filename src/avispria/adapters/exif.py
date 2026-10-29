@@ -19,6 +19,7 @@ TAG_MAKE = 271
 TAG_MODEL = 272
 TAG_SUB_IFDS = 330
 TAG_EXIF_IFD = 34665
+TAG_GPS_IFD = 34853
 TAG_EXPOSURE_TIME = 33434
 TAG_ISO = 34855
 TAG_DATETIME_ORIGINAL = 36867
@@ -46,6 +47,9 @@ class ExifInfo:
     focal_mm: float | None = None
     focal_35mm: int | None = None
     datetime_original: str | None = None
+    gps_lat: float | None = None  # decimal degrees, from the standard EXIF GPS block
+    gps_lon: float | None = None
+    gps_alt_m: float | None = None  # above sea level (older DJI firmware, other drones)
 
 
 Read = Callable[[int, int], bytes]
@@ -115,6 +119,17 @@ class _Tiff:
         (value,) = struct.unpack(self.e + fmt, raw[: struct.calcsize(fmt)])
         return float(value)
 
+    def rationals(self, entry: tuple[int, int, bytes] | None) -> list[float]:
+        """All values of a RATIONAL array (e.g. GPS degrees, minutes, seconds)."""
+        if entry is None or entry[0] != 5:
+            return []
+        _, n, raw = entry
+        out = []
+        for i in range(n):
+            num, den = struct.unpack(self.e + "II", raw[8 * i : 8 * i + 8])
+            out.append(num / den if den else 0.0)
+        return out
+
     @staticmethod
     def text(entry: tuple[int, int, bytes] | None) -> str | None:
         if entry is None or entry[0] != 2:
@@ -126,9 +141,28 @@ def _first(values: list[int]) -> int | None:
     return values[0] if values else None
 
 
+def _gps(t: _Tiff, ifd0: dict[int, tuple[int, int, bytes]]) -> tuple[float | None, ...]:
+    if TAG_GPS_IFD not in ifd0:
+        return None, None, None
+    gps = t.ifd(t.ints(ifd0[TAG_GPS_IFD])[0])
+
+    def degrees(value_tag: int, ref_tag: int, negative: str) -> float | None:
+        dms = t.rationals(gps.get(value_tag))
+        if len(dms) != 3:
+            return None
+        value = dms[0] + dms[1] / 60 + dms[2] / 3600
+        return -value if (t.text(gps.get(ref_tag)) or "").upper() == negative else value
+
+    altitude = t.rational(gps.get(6))
+    if altitude is not None and _first(t.ints(gps.get(5))) == 1:  # below sea level
+        altitude = -altitude
+    return degrees(2, 1, "S"), degrees(4, 3, "W"), altitude
+
+
 def _parse(t: _Tiff) -> ExifInfo:
     ifd0 = t.ifd(t.ifd0)
     exif = t.ifd(t.ints(ifd0[TAG_EXIF_IFD])[0]) if TAG_EXIF_IFD in ifd0 else {}
+    gps_lat, gps_lon, gps_alt = _gps(t, ifd0)
     width = _first(t.ints(exif.get(TAG_PIXEL_X)))
     height = _first(t.ints(exif.get(TAG_PIXEL_Y)))
     # DNG: the full-resolution image lives in a SubIFD with NewSubfileType 0
@@ -151,6 +185,9 @@ def _parse(t: _Tiff) -> ExifInfo:
         focal_mm=t.rational(exif.get(TAG_FOCAL_LENGTH)),
         focal_35mm=_first(t.ints(exif.get(TAG_FOCAL_35MM))),
         datetime_original=t.text(exif.get(TAG_DATETIME_ORIGINAL)),
+        gps_lat=gps_lat,
+        gps_lon=gps_lon,
+        gps_alt_m=gps_alt,
     )
 
 

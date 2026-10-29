@@ -30,6 +30,10 @@ Read [DISCLAIMER.md](DISCLAIMER.md) before using any output near an aircraft.
 - Checks a folder of photos (JPEG or DNG) from metadata alone: ground resolution,
   overlap with neighbours, how much of the area is seen by 3+ and 5+ photos,
   motion blur risk, gimbal angle, altitude consistency and timing gaps.
+- Can take the terrain into account: `qa --dem model.tif` computes each photo's height above
+  the surface beneath it (use `--takeoff LAT,LON` with any external elevation model, or
+  none with the surface model the engine made from the same photos), so resolution and
+  overlap are right over hills, not only over flat ground.
 - Derives a camera profile for any DJI drone from one original photo.
 - `avispria doctor` checks this computer (memory, virtual memory, disk, CPU, whether
   WebODM is running) and says whether a photo folder can be processed here. If not,

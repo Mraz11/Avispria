@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import rasterio
+from rasterio.enums import Resampling
 from rasterio.warp import transform_bounds
 from rasterio.windows import Window, from_bounds
 
@@ -17,8 +18,16 @@ from avispria.core.terrain import Dem
 BUFFER_DEG = 0.01  # ~1 km of context around the AOI and takeoff point
 
 
-def load_dem_window(path: Path, bounds_lonlat: tuple[float, float, float, float]) -> Dem:
-    """Crop ``path`` to ``bounds_lonlat`` (min lon, min lat, max lon, max lat) + buffer."""
+def load_dem_window(
+    path: Path,
+    bounds_lonlat: tuple[float, float, float, float],
+    max_side_px: int | None = None,
+) -> Dem:
+    """Crop ``path`` to ``bounds_lonlat`` (min lon, min lat, max lon, max lat) + buffer.
+
+    With ``max_side_px`` a larger window is read at reduced size by averaging (no-data
+    cells are ignored), so a 5 cm surface model of a whole site fits in memory.
+    """
     min_lon, min_lat, max_lon, max_lat = bounds_lonlat
     buffered = (
         min_lon - BUFFER_DEG,
@@ -42,9 +51,23 @@ def load_dem_window(path: Path, bounds_lonlat: tuple[float, float, float, float]
         window = window.round_offsets().round_lengths()
         window = window.intersection(Window(0, 0, src.width, src.height))
         nodata = src.nodata
-        data = src.read(1, window=window).astype("float64")
         transform = src.window_transform(window)
-    values = data if nodata is None else np.where(data == nodata, np.nan, data)
+        rows, cols = int(window.height), int(window.width)
+        if max_side_px and max(rows, cols) > max_side_px:
+            scale = max_side_px / max(rows, cols)
+            out_rows, out_cols = max(1, round(rows * scale)), max(1, round(cols * scale))
+            masked = src.read(
+                1,
+                window=window,
+                out_shape=(out_rows, out_cols),
+                resampling=Resampling.average,
+                masked=True,
+            )
+            values = np.ma.filled(masked.astype("float64"), np.nan)
+            transform = transform * transform.scale(cols / out_cols, rows / out_rows)
+        else:
+            data = src.read(1, window=window).astype("float64")
+            values = data if nodata is None else np.where(data == nodata, np.nan, data)
     t = transform
     return Dem(
         values,

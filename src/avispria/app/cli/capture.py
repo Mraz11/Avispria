@@ -13,7 +13,8 @@ from avispria.adapters.exif import ExifError
 from avispria.adapters.photos import photo_subfolders
 from avispria.adapters.profiles import load_profiles
 from avispria.app.capture_workflow import camera_toml, report_csv, run_qa
-from avispria.app.cli._base import app, print_issues
+from avispria.app.cli._base import app, parse_latlon, print_issues
+from avispria.core.errors import PlanningError
 
 
 @app.command()
@@ -24,14 +25,42 @@ def qa(
     recursive: Annotated[
         bool, typer.Option("--recursive", "-r", help="Include photos in subfolders")
     ] = False,
+    dem: Annotated[
+        Path | None,
+        typer.Option(
+            "--dem",
+            exists=True,
+            dir_okay=False,
+            help="Elevation model (GeoTIFF) to use the terrain",
+        ),
+    ] = None,
+    takeoff: Annotated[
+        str | None,
+        typer.Option(
+            help="Takeoff point LAT,LON (use with --dem unless it is the surface model made "
+            "from these same photos)"
+        ),
+    ] = None,
 ) -> None:
     """Check overlap, coverage, blur, gimbal, altitude and timing of survey photos."""
+    if takeoff is not None and dem is None:
+        raise typer.BadParameter("--takeoff only makes sense together with --dem")
+    takeoff_lonlat = None
+    if takeoff is not None:
+        lat, lon = parse_latlon(takeoff)
+        takeoff_lonlat = (lon, lat)
     profile = None
     if drone is not None:
         profile = load_profiles().get(drone)
         if profile is None:
             raise typer.BadParameter(f"unknown drone {drone!r}; see `avispria drones`")
-    report, skipped = run_qa(folder, profile, recursive=recursive)
+    try:
+        report, skipped, ground = run_qa(
+            folder, profile, recursive=recursive, dem_path=dem, takeoff=takeoff_lonlat
+        )
+    except PlanningError as exc:
+        typer.secho(f"Cannot use the elevation model: {exc}", fg=typer.colors.RED)
+        raise typer.Exit(1) from exc
     s = report.stats
     if s["photos_total"] == 0 and not skipped:
         typer.secho(f"No photos directly in {folder}", fg=typer.colors.YELLOW)
@@ -46,10 +75,21 @@ def qa(
     for name, reason in skipped:
         typer.secho(f"  skipped {name}: {reason}", fg=typer.colors.YELLOW)
     if "gsd_cm_median" in s:
+        above = "the surface" if s["terrain_aware"] else "takeoff"
         typer.echo(
-            f"height {s['altitude_m_median']:.1f} m above takeoff   "
+            f"height {s['altitude_m_median']:.1f} m above {above}   "
             f"GSD {s['gsd_cm_median']:.2f} cm/px"
         )
+        if ground is not None and ground.agl_m:
+            how = (
+                "height differences from the takeoff point"
+                if ground.mode == "takeoff"
+                else "photo altitudes compared with the model"
+            )
+            typer.echo(
+                f"terrain used for {int(s['terrain_photos'])} of {int(s['photos_used'])} photos "
+                f"({how})"
+            )
         typer.echo(
             f"area seen by {int(s['min_views'])}+ photos: {s['area_pct_min_views']:.0f}%   "
             f"by {int(s['good_views'])}+: {s['area_pct_good_views']:.0f}%   "

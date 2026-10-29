@@ -17,6 +17,7 @@ def make_dji_jpeg(
     lat: float = 22.2823982,
     lon: float = 91.7798470,
     altitude: float = 60.0,
+    absolute_altitude: float | None = None,
 ) -> Path:
     img = Image.new("RGB", size, (80, 130, 60))
     exif = Image.Exif()
@@ -31,6 +32,7 @@ def make_dji_jpeg(
         GpsLatitude=f"{lat:+.7f}",
         GpsLongitude=f"{lon:+.7f}",
         RelativeAltitude=f"{altitude:+.1f}",
+        **({} if absolute_altitude is None else {"AbsoluteAltitude": f"{absolute_altitude:+.3f}"}),
         GimbalPitchDegree="-90.0",
         GimbalYawDegree="0.0",
         ShutterType="Electronic",

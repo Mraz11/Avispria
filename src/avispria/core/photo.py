@@ -27,3 +27,4 @@ class PhotoRecord:
     model: str | None
     product: str | None
     shutter: str | None
+    absolute_altitude_m: float | None = None  # in the drone's own height reference

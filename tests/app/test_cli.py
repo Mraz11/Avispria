@@ -367,3 +367,105 @@ def test_doctor_assumes_full_size_for_raw_photos(
     result = runner.invoke(app, ["doctor", str(folder)])
     assert result.exit_code == 0, result.output
     assert "processed at 12.2 MP" not in result.output
+
+
+def test_qa_with_dem_and_takeoff_uses_the_terrain(tmp_path: Path, dem: Path) -> None:
+    folder = _photo_folder(tmp_path)
+    result = runner.invoke(
+        app, ["qa", str(folder), "--dem", str(dem), "--takeoff", "51.4769,-0.0015"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "above the surface" in result.output
+    assert (
+        "terrain used for 12 of 12 photos (height differences from the takeoff point)"
+        in result.output
+    )
+
+
+def test_qa_with_dem_but_no_takeoff_explains_why_terrain_was_not_used(
+    tmp_path: Path, dem: Path
+) -> None:
+    result = runner.invoke(app, ["qa", str(_photo_folder(tmp_path)), "--dem", str(dem)])
+    assert result.exit_code == 0, result.output
+    assert "above takeoff" in result.output and "QA011" in result.output
+    assert "--takeoff" in result.output
+
+
+def test_qa_takeoff_needs_a_model(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["qa", str(_photo_folder(tmp_path)), "--takeoff", "51.4,0.0"])
+    assert (
+        result.exit_code == 2 and "--takeoff only makes sense together with --dem" in result.output
+    )
+
+
+def test_qa_model_that_does_not_cover_the_photos(tmp_path: Path) -> None:
+    far = tmp_path / "far.tif"
+    with rasterio.open(
+        far,
+        "w",
+        driver="GTiff",
+        height=10,
+        width=10,
+        count=1,
+        dtype="float32",
+        crs="EPSG:4326",
+        transform=from_origin(10.0, 10.0, 0.001, 0.001),
+    ) as dst:
+        dst.write(np.zeros((10, 10), "float32"), 1)
+    result = runner.invoke(
+        app, ["qa", str(_photo_folder(tmp_path)), "--dem", str(far), "--takeoff", "51.4769,-0.0015"]
+    )
+    assert result.exit_code == 1 and "Cannot use the elevation model" in result.output
+
+
+def test_qa_absolute_mode_wording(tmp_path: Path) -> None:
+    """Photos carrying an absolute altitude in the model's own height reference."""
+    import numpy as np
+    import rasterio
+    from rasterio.transform import from_origin
+
+    from tiffbuild import IFD_POINTER, build_tiff, dji_xmp, jpeg_with
+
+    folder = tmp_path / "abs"
+    folder.mkdir()
+    for k in range(6):
+        xmp = dji_xmp(
+            GpsLatitude=f"{51.4769 + (k % 3) * 0.0001:.7f}",
+            GpsLongitude=f"{-0.0015 + (k // 3) * 0.0003:.7f}",
+            RelativeAltitude="60.0",
+            AbsoluteAltitude="160.0",
+            GimbalPitchDegree="-90.0",
+            GimbalYawDegree="0.0",
+            FlightXSpeed="3.0",
+            FlightYSpeed="0.0",
+            ProductName="Lito X1",
+        )
+        ifds = {
+            "ifd0": [(271, 2, "DJI"), (272, 2, "FC9589"), (34665, IFD_POINTER, "exif")],
+            "exif": [
+                (33434, 5, [(1, 2000)]),
+                (36867, 2, f"2026:10:24 12:00:{2 * k:02d}"),
+                (37386, 5, [(672, 100)]),
+                (41989, 3, 24),
+                (40962, 4, 4032),
+                (40963, 4, 3024),
+            ],
+        }
+        (folder / f"P{k}.JPG").write_bytes(jpeg_with(build_tiff(ifds, ["ifd0", "exif"]), xmp))
+    surface = tmp_path / "surface.tif"
+    with rasterio.open(
+        surface,
+        "w",
+        driver="GTiff",
+        height=50,
+        width=50,
+        count=1,
+        dtype="float32",
+        crs="EPSG:4326",
+        transform=from_origin(-0.01, 51.49, 0.0005, 0.0005),
+    ) as dst:
+        dst.write(np.full((50, 50), 130.0, "float32"), 1)  # photos at 160 -> 30 m above it
+    result = runner.invoke(app, ["qa", str(folder), "--dem", str(surface)])
+    assert result.exit_code == 0, result.output
+    assert "height 30.0 m above the surface" in result.output
+    assert "photo altitudes compared with the model" in result.output

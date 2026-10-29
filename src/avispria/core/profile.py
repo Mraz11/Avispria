@@ -9,7 +9,6 @@ from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
-from pyproj import Transformer
 
 from avispria.core.clearance import along_track_envelope, enforce_slope, fit_profile
 from avispria.core.errors import PlanningError
@@ -65,10 +64,7 @@ def flat_profile(n_samples: int, mandatory: Sequence[int], agl_m: float) -> Heig
 
 
 def _to_dem_crs(dem: Dem, lons: FloatArray, lats: FloatArray) -> tuple[FloatArray, FloatArray]:
-    if dem.is_geographic:
-        return lons, lats
-    xs, ys = Transformer.from_crs("EPSG:4326", dem.crs, always_xy=True).transform(lons, lats)
-    return np.asarray(xs, float), np.asarray(ys, float)
+    return dem.lonlat_to_xy(lons, lats)
 
 
 def _takeoff_elevation(dem: Dem, lon: float, lat: float, radius_m: float) -> tuple[float, str]:

@@ -15,6 +15,7 @@ XMP = dji_xmp(
     GpsLatitude="+22.282398204",
     GpsLongitude="+91.779846956",
     RelativeAltitude="+199.300",
+    AbsoluteAltitude="+272.097",
     GimbalPitchDegree="-90.00",
     GimbalYawDegree="+4.50",
     FlightXSpeed="0.0",
@@ -94,6 +95,7 @@ def test_read_photo_record(tmp_path: Path, make) -> None:  # type: ignore[no-unt
     r = read_photo(path)
     assert r.lat == pytest.approx(22.282398204) and r.lon == pytest.approx(91.779846956)
     assert r.relative_altitude_m == pytest.approx(199.3)
+    assert r.absolute_altitude_m == pytest.approx(272.097)
     assert r.gimbal_pitch_deg == pytest.approx(-90.0)
     assert r.speed_ms == pytest.approx(0.1)
     assert r.time == datetime(2026, 10, 24, 12, 4, 56, tzinfo=timezone(timedelta(hours=6)))
@@ -182,6 +184,7 @@ def test_exif_gps_fallback_for_older_dji_firmware(tmp_path: Path) -> None:
         -91.994561, abs=1e-6
     )
     assert r.relative_altitude_m == pytest.approx(39.8)
+    assert r.absolute_altitude_m == pytest.approx(198.31)  # from the EXIF GPS altitude
 
 
 def test_xmp_position_wins_over_exif() -> None:

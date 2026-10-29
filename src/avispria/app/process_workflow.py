@@ -29,7 +29,7 @@ from avispria.adapters.engine import (
 from avispria.adapters.photos import photo_files, scan_photos
 from avispria.adapters.resize import resize_photo
 from avispria.app.capture_workflow import camera_chooser
-from avispria.app.result_quality import read_stats, report_quality
+from avispria.app.result_quality import read_stats, report_quality, summarize_result
 from avispria.core.capture import analyse_capture
 from avispria.core.feasibility import Assessment, JobSpec, SystemSpec, assess, gb
 from avispria.core.processing import (
@@ -40,7 +40,7 @@ from avispria.core.processing import (
     build_options,
     effective_gsd_cm,
 )
-from avispria.core.quality import ReconstructionSummary, summarize_reconstruction
+from avispria.core.quality import ReconstructionSummary
 from avispria.core.safety import Issue
 from avispria.core.version import __version__
 
@@ -250,8 +250,9 @@ def run_process(
             stats = read_stats(results_dir)
             if stats is not None:
                 rep.step("Result quality")
-                # compare with the GSD of the photos as uploaded (after any resizing)
-                reconstruction = summarize_reconstruction(stats, sent_gsd)
+                reconstruction = summarize_result(
+                    stats, records, results_dir, sent_gsd, native_mp, processing_mp
+                )
                 report_quality(reconstruction, rep.info, rep.warn)
     finally:
         shutil.rmtree(upload_dir, ignore_errors=True)
@@ -273,7 +274,8 @@ def run_process(
         "assessment": {"verdict": assessment.verdict, "ram_gb": assessment.ram_gb},
         "reconstruction": None
         if reconstruction is None
-        else asdict(reconstruction) | {"points_per_m2": reconstruction.points_per_m2},
+        else asdict(reconstruction)
+        | {"points_per_m2": reconstruction.points_per_m2, "gsd_ratio": reconstruction.gsd_ratio},
         "capture_qa": {
             "advisory": True,
             "stats": qa.stats,

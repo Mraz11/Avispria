@@ -11,7 +11,7 @@ from __future__ import annotations
 import itertools
 import math
 import statistics
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
@@ -91,8 +91,16 @@ def _names(items: Sequence[str], limit: int = 5) -> str:
     return shown + (f" and {len(items) - limit} more" if len(items) > limit else "")
 
 
+def _height(r: PhotoRecord, agl: Mapping[str, float]) -> float:
+    """Height above the surface if known (terrain-aware), else above the takeoff point."""
+    assert r.relative_altitude_m is not None
+    return agl.get(r.name, r.relative_altitude_m)
+
+
 def _footprints(
-    records: Sequence[PhotoRecord], camera_for: Callable[[PhotoRecord], CameraProfile]
+    records: Sequence[PhotoRecord],
+    camera_for: Callable[[PhotoRecord], CameraProfile],
+    agl: Mapping[str, float],
 ) -> list[_Footprint]:
     lon0 = statistics.fmean(r.lon for r in records if r.lon is not None)
     lat0 = statistics.fmean(r.lat for r in records if r.lat is not None)
@@ -101,7 +109,7 @@ def _footprints(
     for r in records:
         assert r.lon is not None and r.lat is not None and r.relative_altitude_m is not None
         cam = camera_for(r)
-        g = gsd_m(cam, r.relative_altitude_m)
+        g = gsd_m(cam, _height(r, agl))
         xs, ys = frame.to_local([r.lon], [r.lat])
         yaw = math.radians(r.gimbal_yaw_deg or 0.0)
         out.append(
@@ -138,9 +146,16 @@ def analyse_capture(
     records: Sequence[PhotoRecord],
     camera_for: Callable[[PhotoRecord], CameraProfile],
     thresholds: QaThresholds | None = None,
+    agl_m: Mapping[str, float] | None = None,
 ) -> CaptureReport:
-    """Assess overlap, coverage, blur, gimbal, altitude and timing of a photo set."""
+    """Assess overlap, coverage, blur, gimbal, altitude and timing of a photo set.
+
+    ``agl_m`` maps photo names to their height above the surface beneath them (see
+    ``core.ground``). Photos without an entry use their height above takeoff, which
+    is only right over flat ground at the takeoff level.
+    """
     thr = thresholds or QaThresholds()
+    agl = agl_m or {}
     issues: list[Issue] = []
 
     def warn(code: str, message: str, level: Literal["error", "warning"] = "warning") -> None:
@@ -169,7 +184,7 @@ def analyse_capture(
     if not used:
         return CaptureReport((), issues, stats)
 
-    fps = _footprints(used, camera_for)
+    fps = _footprints(used, camera_for, agl)
     polys = [f.polygon() for f in fps]
     rows: list[PhotoQa] = []
     for i, f in enumerate(fps):
@@ -192,10 +207,11 @@ def analyse_capture(
     blurred = [p.name for p in rows if p.blur_px is not None and p.blur_px > thr.max_blur_px]
     if blurred:
         warn("QA002", f"motion blur over {thr.max_blur_px:g} px likely: {_names(blurred)}")
-    alts = [r.relative_altitude_m for r in used if r.relative_altitude_m is not None]
+    alts = [_height(r, agl) for r in used]
     alt_med = statistics.median(alts)
     if (max(alts) - min(alts)) / alt_med > thr.max_altitude_spread:
-        warn("QA003", f"altitude varies {min(alts):.1f}-{max(alts):.1f} m: mixed resolution")
+        what = "height above the surface" if agl else "altitude"
+        warn("QA003", f"{what} varies {min(alts):.1f}-{max(alts):.1f} m: mixed resolution")
     times = [r.time for r in used if r.time is not None]
     if len(times) >= 3:
         gaps = [(b - a).total_seconds() for a, b in itertools.pairwise(times)]
@@ -234,6 +250,8 @@ def analyse_capture(
     stats |= {
         "gsd_cm_median": round(statistics.median(p.gsd_m for p in rows) * 100, 3),
         "altitude_m_median": alt_med,
+        "terrain_aware": 1.0 if any(r.name in agl for r in used) else 0.0,
+        "terrain_photos": float(sum(r.name in agl for r in used)),
         "overlap_prev_median": statistics.median(overlaps) if overlaps else float("nan"),
         "min_views": thr.min_views,
         "good_views": thr.good_views,

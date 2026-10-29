@@ -67,6 +67,7 @@ def read_photo(path: Path) -> PhotoRecord:
         lat=_first_of(_num(xmp, "GpsLatitude"), exif.gps_lat),  # DJI XMP, else EXIF GPS
         lon=_first_of(_num(xmp, "GpsLongitude"), exif.gps_lon),
         relative_altitude_m=_num(xmp, "RelativeAltitude"),
+        absolute_altitude_m=_first_of(_num(xmp, "AbsoluteAltitude"), exif.gps_alt_m),
         gimbal_pitch_deg=_num(xmp, "GimbalPitchDegree"),
         gimbal_yaw_deg=_num(xmp, "GimbalYawDegree"),
         speed_ms=None if vx is None or vy is None else math.hypot(vx, vy),

@@ -16,6 +16,7 @@ from typing import Literal
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 from numpy.typing import ArrayLike, NDArray
+from pyproj import Transformer
 
 FloatArray = NDArray[np.float64]
 Affine6 = tuple[float, float, float, float, float, float]
@@ -44,6 +45,19 @@ class Dem:
     @property
     def is_geographic(self) -> bool:
         return self.crs.upper() in GEOGRAPHIC_CRS
+
+    def lonlat_to_xy(self, lons: ArrayLike, lats: ArrayLike) -> tuple[FloatArray, FloatArray]:
+        """Longitude/latitude (WGS 84) converted to this DEM's coordinate system."""
+        lon = np.asarray(lons, dtype=float)
+        lat = np.asarray(lats, dtype=float)
+        if self.is_geographic:
+            return lon, lat
+        xs, ys = Transformer.from_crs("EPSG:4326", self.crs, always_xy=True).transform(lon, lat)
+        return np.asarray(xs, dtype=float), np.asarray(ys, dtype=float)
+
+    def sample_lonlat(self, lons: ArrayLike, lats: ArrayLike) -> FloatArray:
+        """Bilinear elevation at longitude/latitude points, whatever the DEM's CRS."""
+        return self.sample(*self.lonlat_to_xy(lons, lats))
 
     def sample(self, xs: ArrayLike, ys: ArrayLike) -> FloatArray:
         """Bilinear elevation at (xs, ys) in the DEM CRS; NaN outside or near no-data."""

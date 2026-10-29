@@ -186,3 +186,46 @@ def test_stats_file_problems_never_break_processing(tmp_path: Path) -> None:
     assert read_stats(tmp_path) is None  # corrupt
     (tmp_path / "odm_report" / "stats.json").write_text("[1, 2]")
     assert read_stats(tmp_path) is None  # wrong shape
+
+
+def terrain_photo_folder(tmp_path: Path) -> Path:
+    folder = tmp_path / "hill" / "images"
+    folder.mkdir(parents=True)
+    for i in range(6):
+        make_dji_jpeg(
+            folder / f"DJI_{i:04d}.JPG",
+            size=(800, 600),
+            altitude=60.0,
+            absolute_altitude=160.0,
+            lat=22.2820 + (i % 3) * 0.0001,
+            lon=91.7790 + (i // 3) * 0.0002,
+        )
+    return folder
+
+
+def test_process_checks_its_estimate_against_the_engines_surface_model(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    folder, out = terrain_photo_folder(tmp_path), tmp_path / "out"
+    with fake_engine("t", dsm_elevation=130.0) as (port, _):  # photos at 160: 30 m above it
+        _patch(monkeypatch, port, "t")
+        result = _run(folder, out)
+    assert result.exit_code == 0, result.output
+    assert "using the terrain" in result.output and "on flat ground)" in result.output
+    rec = json.loads((out / "avispria_provenance.json").read_text())["reconstruction"]
+    # the surface is 30 m below the camera, not the 60 m above takeoff the flat estimate assumes
+    assert rec["gsd_cm_flat"] == pytest.approx(rec["gsd_cm_estimated"] * 2, rel=0.01)
+    assert rec["gsd_ratio"] == pytest.approx(rec["gsd_cm_measured"] / rec["gsd_cm_estimated"])
+    assert (out / "results" / "odm_dem" / "dsm.tif").exists()
+
+
+def test_process_without_a_surface_model_keeps_the_flat_estimate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    folder, out = terrain_photo_folder(tmp_path), tmp_path / "out"
+    with fake_engine("t") as (port, _):  # the fake engine returns no DSM
+        _patch(monkeypatch, port, "t")
+        result = _run(folder, out)
+    assert result.exit_code == 0, result.output
+    rec = json.loads((out / "avispria_provenance.json").read_text())["reconstruction"]
+    assert rec["gsd_cm_flat"] is None and "using the terrain" not in result.output

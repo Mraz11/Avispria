@@ -30,6 +30,7 @@ class ReconstructionSummary:
     area_m2: float | None = None
     gsd_cm_measured: float | None = None
     gsd_cm_estimated: float | None = None
+    gsd_cm_flat: float | None = None  # flat-ground estimate, when terrain was used for the main one
     issues: list[Issue] = field(default_factory=list)
 
     @property
@@ -72,9 +73,15 @@ def _dense_points(stats: Mapping[str, object]) -> int | None:
 
 
 def summarize_reconstruction(
-    stats: Mapping[str, object], gsd_estimated_cm: float | None
+    stats: Mapping[str, object],
+    gsd_estimated_cm: float | None,
+    gsd_flat_cm: float | None = None,
 ) -> ReconstructionSummary:
-    """Key numbers from ODX's statistics, with warnings for results needing attention."""
+    """Key numbers from ODX's statistics, with warnings for results needing attention.
+
+    ``gsd_estimated_cm`` is Avispria's best estimate (terrain-aware when the engine's
+    surface model was available); ``gsd_flat_cm`` the flat-ground one, shown for contrast.
+    """
     rec = _section(stats, "reconstruction_statistics")
     summary = ReconstructionSummary(
         photos_total=_count(rec, "initial_shots_count"),
@@ -87,6 +94,7 @@ def summarize_reconstruction(
         area_m2=_number(_section(stats, "processing_statistics"), "area"),
         gsd_cm_measured=_number(_section(stats, "odm_processing_statistics"), "average_gsd"),
         gsd_cm_estimated=gsd_estimated_cm,
+        gsd_cm_flat=gsd_flat_cm,
     )
     issues: list[Issue] = []
     placed, total = summary.photos_placed, summary.photos_total

@@ -52,11 +52,35 @@ OPTIONS = [
 ]
 
 
+def _flat_dsm(elevation: float) -> bytes:
+    """A small WGS 84 GeoTIFF of constant elevation around the process-test photos."""
+    import numpy as np
+    from rasterio.io import MemoryFile
+    from rasterio.transform import from_origin
+
+    with MemoryFile() as mem:
+        with mem.open(
+            driver="GTiff",
+            height=100,
+            width=100,
+            count=1,
+            dtype="float32",
+            crs="EPSG:4326",
+            transform=from_origin(91.77, 22.29, 0.0004, 0.0004),
+            nodata=-9999.0,
+        ) as dst:
+            dst.write(np.full((100, 100), elevation, "float32"), 1)
+        return mem.read()
+
+
 class FakeState:
     """What the fake engine received and how the task should end."""
 
-    def __init__(self, token: str, outcome: str = "complete") -> None:
+    def __init__(
+        self, token: str, outcome: str = "complete", dsm_elevation: float | None = None
+    ) -> None:
         self.token = token
+        self.dsm_elevation = dsm_elevation
         self.outcome = outcome  # "complete" or "fail"
         self.options: list[dict[str, object]] = []
         self.uploads = 0
@@ -64,14 +88,15 @@ class FakeState:
         self.uuid = "4f1c-test-task"
 
 
-def results_zip() -> bytes:
+def results_zip(dsm_elevation: float | None = None) -> bytes:
     import io
     import zipfile
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
         z.writestr("odm_orthophoto/odm_orthophoto.tif", b"fake orthophoto")
-        z.writestr("odm_dem/dsm.tif", b"fake dsm")
+        if dsm_elevation is None:
+            z.writestr("odm_dem/dsm.tif", b"fake dsm")  # not a raster: must not break processing
         z.writestr("odm_georeferencing/odm_georeferenced_model.laz", b"fake laz")
         z.writestr("log.json", b"{}")
         fixture = (
@@ -81,6 +106,8 @@ def results_zip() -> bytes:
             / "stats_brighton_standard.json"
         )
         z.writestr("odm_report/stats.json", fixture.read_bytes())
+        if dsm_elevation is not None:
+            z.writestr("odm_dem/dsm.tif", _flat_dsm(dsm_elevation))
     return buf.getvalue()
 
 
@@ -136,7 +163,7 @@ def _handler(state: FakeState) -> type[BaseHTTPRequestHandler]:
                     ]
                 )
             elif path == f"/task/{state.uuid}/download/all.zip":
-                self._send(None, raw=results_zip())
+                self._send(None, raw=results_zip(state.dsm_elevation))
             else:
                 self._send({"error": "not found"})
 
@@ -175,11 +202,11 @@ def fake_nodeodx(token: str = "s3cret", outcome: str = "complete") -> Iterator[i
 
 @contextmanager
 def fake_engine(
-    token: str = "s3cret", outcome: str = "complete"
+    token: str = "s3cret", outcome: str = "complete", dsm_elevation: float | None = None
 ) -> Iterator[tuple[int, FakeState]]:
     from http.server import ThreadingHTTPServer
 
-    state = FakeState(token, outcome)
+    state = FakeState(token, outcome, dsm_elevation)
     server = ThreadingHTTPServer(("127.0.0.1", 0), _handler(state))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

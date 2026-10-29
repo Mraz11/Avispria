@@ -6,13 +6,16 @@ from __future__ import annotations
 
 import csv
 import io
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
+from avispria.adapters.dem_file import load_dem_window
 from avispria.adapters.photos import read_photo, scan_photos
 from avispria.adapters.profiles import DroneProfile
 from avispria.core.camera import CameraProfile, sensor_size_from_exif
 from avispria.core.capture import CaptureReport, QaThresholds, analyse_capture
+from avispria.core.errors import PlanningError
+from avispria.core.ground import GroundHeights, heights_above_ground
 from avispria.core.photo import PhotoRecord
 from avispria.core.safety import Issue
 
@@ -69,18 +72,64 @@ def camera_chooser(
     return choose
 
 
+MAX_QA_DEM_PX = 2048  # larger elevation models are read at reduced size
+
+
+def terrain_heights(
+    records: Sequence[PhotoRecord], dem_path: Path, takeoff: tuple[float, float] | None
+) -> GroundHeights:
+    """Height of each photo above the surface, from the elevation model in ``dem_path``.
+
+    ``takeoff`` is (longitude, latitude). Raises PlanningError if the model does not
+    cover the photos.
+    """
+    points = [(r.lon, r.lat) for r in records if r.lon is not None and r.lat is not None]
+    if takeoff is not None:
+        points.append(takeoff)
+    if not points:
+        return GroundHeights({}, "ignored")
+    lons, lats = zip(*points, strict=True)
+    bounds = (min(lons), min(lats), max(lons), max(lats))
+    dem = load_dem_window(dem_path, bounds, max_side_px=MAX_QA_DEM_PX)
+    return heights_above_ground(records, dem, takeoff)
+
+
+def terrain_gsd_cm(records: Sequence[PhotoRecord], dem_path: Path) -> float | None:
+    """Median ground resolution of the photos using the terrain, or None if unavailable."""
+    try:
+        ground = terrain_heights(records, dem_path, None)
+    except (PlanningError, OSError, ValueError):
+        return None
+    if not ground.agl_m:
+        return None
+    report = analyse_capture(records, camera_chooser(None, []), agl_m=ground.agl_m)
+    value = report.stats.get("gsd_cm_median")
+    return None if value is None else float(value)
+
+
 def run_qa(
     folder: Path,
     profile: DroneProfile | None,
     thresholds: QaThresholds | None = None,
     *,
     recursive: bool = False,
-) -> tuple[CaptureReport, list[tuple[str, str]]]:
+    dem_path: Path | None = None,
+    takeoff: tuple[float, float] | None = None,
+) -> tuple[CaptureReport, list[tuple[str, str]], GroundHeights | None]:
+    """Capture QA; with ``dem_path`` the terrain under each photo is taken into account."""
     records, skipped = scan_photos(folder, recursive=recursive)
     notes: list[Issue] = []
-    report = analyse_capture(records, camera_chooser(profile, notes), thresholds)
+    ground = None if dem_path is None else terrain_heights(records, dem_path, takeoff)
+    report = analyse_capture(
+        records,
+        camera_chooser(profile, notes),
+        thresholds,
+        agl_m=None if ground is None else ground.agl_m,
+    )
     report.issues.extend(notes)
-    return report, skipped
+    if ground is not None:
+        report.issues.extend(ground.issues)
+    return report, skipped, ground
 
 
 def report_csv(report: CaptureReport) -> str:

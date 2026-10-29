@@ -131,3 +131,28 @@ def test_thresholds_are_configurable() -> None:
     assert "QA010" in codes(strict)
     lenient = analyse_capture(real_2x2(), lambda r: CAM, QaThresholds(good_views=4, min_views=2))
     assert lenient.stats["area_pct_min_views"] == pytest.approx(100.0)
+
+
+def test_height_above_ground_drives_gsd_and_footprints() -> None:
+    w, h = footprint_m(CAM, 60.0)
+    photos = grid(rows=4, cols=3, dx=w * 0.3, dy=h * 0.2)
+    flat = analyse_capture(photos, lambda r: CAM)
+    aware = analyse_capture(photos, lambda r: CAM, agl_m={p.name: 40.0 for p in photos})
+    assert flat.stats["terrain_aware"] == 0.0 and aware.stats["terrain_aware"] == 1.0
+    assert aware.stats["gsd_cm_median"] == pytest.approx(
+        flat.stats["gsd_cm_median"] * 40 / 60, rel=1e-3
+    )
+    assert aware.stats["altitude_m_median"] == pytest.approx(40.0)
+    # same spacing, smaller footprints: less overlap
+    assert aware.stats["overlap_prev_median"] < flat.stats["overlap_prev_median"]
+
+
+def test_altitude_spread_is_judged_on_height_above_ground() -> None:
+    photos = grid(rows=4, cols=3, dx=20.0, dy=10.0)
+    varying_rel = [replace(p, relative_altitude_m=60.0 + 4 * (i % 3)) for i, p in enumerate(photos)]
+    assert "QA003" in codes(analyse_capture(varying_rel, lambda r: CAM))  # flat view: mixed
+    steady_agl = {p.name: 50.0 for p in varying_rel}  # terrain-following flight
+    assert "QA003" not in codes(analyse_capture(varying_rel, lambda r: CAM, agl_m=steady_agl))
+    constant_rel = grid(rows=4, cols=3, dx=20.0, dy=10.0)
+    uneven = {p.name: 40.0 + 6 * (i % 3) for i, p in enumerate(constant_rel)}  # hilly ground
+    assert "QA003" in codes(analyse_capture(constant_rel, lambda r: CAM, agl_m=uneven))

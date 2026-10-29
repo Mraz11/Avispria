@@ -469,3 +469,9 @@ def test_qa_absolute_mode_wording(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert "height 30.0 m above the surface" in result.output
     assert "photo altitudes compared with the model" in result.output
+
+
+def test_qa_shows_front_and_side_overlap(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["qa", str(_photo_folder(tmp_path))])
+    assert result.exit_code == 0, result.output
+    assert "overlap       front" in result.output and "typical," in result.output

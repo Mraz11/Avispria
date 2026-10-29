@@ -156,3 +156,77 @@ def test_altitude_spread_is_judged_on_height_above_ground() -> None:
     constant_rel = grid(rows=4, cols=3, dx=20.0, dy=10.0)
     uneven = {p.name: 40.0 + 6 * (i % 3) for i, p in enumerate(constant_rel)}  # hilly ground
     assert "QA003" in codes(analyse_capture(constant_rel, lambda r: CAM, agl_m=uneven))
+
+
+def test_front_and_side_overlap_are_measured_separately() -> None:
+    w, h = footprint_m(CAM, 60.0)
+    photos = grid(rows=8, cols=6, dx=w * 0.3, dy=h * 0.2)  # 70% side, 80% front
+    rep = analyse_capture(photos, lambda r: CAM)
+    assert rep.stats["front_overlap_median"] == pytest.approx(0.80, abs=0.02)
+    assert rep.stats["side_overlap_median"] == pytest.approx(0.70, abs=0.02)
+    assert rep.stats["side_overlap_p10"] == pytest.approx(0.70, abs=0.02)
+    assert all(p.front_overlap is not None and p.side_overlap is not None for p in rep.photos)
+
+
+def test_a_single_strip_has_no_side_overlap_and_a_gap_between_strips_is_flagged() -> None:
+    w, h = footprint_m(CAM, 60.0)
+    one_strip = analyse_capture(grid(rows=8, cols=1, dx=0.0, dy=h * 0.2), lambda r: CAM)
+    assert "side_overlap_median" not in one_strip.stats
+    assert one_strip.stats["front_overlap_median"] == pytest.approx(0.80, abs=0.02)
+    # strips spaced so that side overlap is only ~30%: front overlap alone cannot hide that
+    gappy = analyse_capture(grid(rows=8, cols=4, dx=w * 0.7, dy=h * 0.2), lambda r: CAM)
+    assert gappy.stats["side_overlap_median"] == pytest.approx(0.30, abs=0.02)
+    assert "QA014" in codes(gappy) and "QA014" not in codes(
+        analyse_capture(grid(rows=8, cols=4, dx=w * 0.3, dy=h * 0.2), lambda r: CAM)
+    )
+
+
+def test_coverage_can_be_measured_over_a_given_area() -> None:
+    from shapely.geometry import box
+
+    w, h = footprint_m(CAM, 60.0)
+    rows, cols, dx, dy = 6, 4, w * 0.3, h * 0.2
+    photos = grid(rows, cols, dx, dy)
+    lon0, lat0 = -0.0015, 51.4769
+    m_lat, m_lon = 111_320.0, 111_320.0 * math.cos(math.radians(lat0))
+    east, north = (cols - 1) * dx / m_lon, (rows - 1) * dy / m_lat
+    hull = analyse_capture(photos, lambda r: CAM).stats["area_pct_good_views"]
+    inside = box(lon0 + east * 0.3, lat0 + north * 0.3, lon0 + east * 0.7, lat0 + north * 0.7)
+    wide = box(lon0 - 3 * east, lat0 - 3 * north, lon0 + 4 * east, lat0 + 4 * north)
+    assert analyse_capture(photos, lambda r: CAM, region=inside).stats["area_pct_good_views"] == (
+        pytest.approx(100.0, abs=1.0)
+    )
+    # an area much larger than the surveyed block is mostly seen by nobody
+    assert (
+        analyse_capture(photos, lambda r: CAM, region=wide).stats["area_pct_good_views"] < hull - 30
+    )
+
+
+def test_neighbour_search_matches_brute_force() -> None:
+    import random
+
+    from shapely.geometry import Polygon  # noqa: F401  (documenting what is compared)
+
+    from avispria.core.footprints import footprints_for, local_frame
+
+    rng = random.Random(7)
+    photos = [
+        replace(
+            p,
+            lon=p.lon + rng.uniform(-3e-4, 3e-4),  # type: ignore[operator]
+            lat=p.lat + rng.uniform(-3e-4, 3e-4),  # type: ignore[operator]
+            gimbal_yaw_deg=rng.uniform(0, 360),
+        )
+        for p in grid(rows=5, cols=5, dx=30.0, dy=20.0)
+    ]
+    rep = analyse_capture(photos, lambda r: CAM)
+    fps = footprints_for(photos, lambda r: CAM, {}, local_frame(photos))
+    polys = [f.polygon() for f in fps]
+    for i, row in enumerate(rep.photos):
+        best = max(
+            (polys[i].intersection(polys[j]).area / polys[i].area, -j)
+            for j in range(len(polys))
+            if j != i
+        )
+        assert row.best_overlap == pytest.approx(best[0], abs=1e-12)
+        assert row.best_neighbour == photos[-best[1]].name

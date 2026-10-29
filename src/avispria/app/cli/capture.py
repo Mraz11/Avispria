@@ -90,6 +90,15 @@ def qa(
                 f"terrain used for {int(s['terrain_photos'])} of {int(s['photos_used'])} photos "
                 f"({how})"
             )
+        if "front_overlap_median" in s or "side_overlap_median" in s:
+            parts = []
+            for label, key in (("front", "front_overlap"), ("side", "side_overlap")):
+                if f"{key}_median" in s:
+                    parts.append(
+                        f"{label} {s[f'{key}_median'] * 100:.0f}% typical, "
+                        f"{s[f'{key}_p10'] * 100:.0f}% at the low end"
+                    )
+            typer.echo("overlap       " + "   ".join(parts))
         typer.echo(
             f"area seen by {int(s['min_views'])}+ photos: {s['area_pct_min_views']:.0f}%   "
             f"by {int(s['good_views'])}+: {s['area_pct_good_views']:.0f}%   "

@@ -58,3 +58,29 @@ def test_resize_plan() -> None:
     assert plan_resize(8064, 6048, None) is None  # full resolution requested
     w, h = plan_resize(5472, 3648, 12.2) or (0, 0)  # 20 MP 3:2
     assert w * h <= 12.2e6 and abs(w / h - 1.5) < 0.01
+
+
+def test_output_resolution_follows_the_photos_gsd() -> None:
+    supported = ALL | {"orthophoto-resolution", "dem-resolution"}
+    p = build_options("standard", supported, electronic_shutter=False, gsd_cm=1.89)
+    assert p.options["orthophoto-resolution"] == pytest.approx(1.9)  # rounded up to 0.1 cm
+    assert p.options["dem-resolution"] == pytest.approx(7.6)  # medium point cloud: ~4x GSD
+    detailed = build_options("detailed", supported, electronic_shutter=False, gsd_cm=1.89)
+    assert detailed.options["dem-resolution"] == pytest.approx(3.8)  # high: ~2x GSD
+    fast = build_options("fast", supported, electronic_shutter=False, gsd_cm=1.89)
+    assert fast.options["orthophoto-resolution"] == pytest.approx(1.9)
+    assert "dem-resolution" not in fast.options  # no surface model in fast
+    assert any("1.9 cm/px" in n for n in p.notes)
+
+
+def test_without_gsd_the_engine_defaults_stay() -> None:
+    supported = ALL | {"orthophoto-resolution", "dem-resolution"}
+    p = build_options("standard", supported, electronic_shutter=False, gsd_cm=None)
+    assert "orthophoto-resolution" not in p.options and "dem-resolution" not in p.options
+
+
+def test_effective_gsd_after_resizing() -> None:
+    from avispria.core.processing import effective_gsd_cm
+
+    assert effective_gsd_cm(1.0, native_mp=48.8, processing_mp=12.2) == pytest.approx(2.0)
+    assert effective_gsd_cm(1.89, native_mp=9.0, processing_mp=9.0) == pytest.approx(1.89)

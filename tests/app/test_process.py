@@ -54,17 +54,21 @@ def test_process_end_to_end(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     assert "hidden-token-123" not in result.output
     assert state.uploads == 6
     sent = {o["name"]: o["value"] for o in state.options}
+    resolution = sent.pop("orthophoto-resolution")
     assert sent == {
         "dsm": True,
         "pc-quality": "medium",
         "feature-quality": "high",
         "rolling-shutter": True,
     }
-    assert "left out: auto-boundary" in result.output  # fake engine lacks it
+    assert "left out: auto-boundary, dem-resolution" in result.output  # fake engine lacks them
+    prov = json.loads((out / "avispria_provenance.json").read_text())
+    native_gsd = prov["capture_qa"]["stats"]["gsd_cm_median"]
+    # photos were halved (0.48 -> 0.12 MP), so the uploaded GSD is twice the native one
+    assert resolution == pytest.approx(native_gsd * 2, abs=0.1)
     assert "resized 6 of 6 photos" in result.output
     assert (out / "results" / "odm_orthophoto" / "odm_orthophoto.tif").exists()
     assert (out / "flight_all.zip").exists() and not (out / ".avispria-upload").exists()
-    prov = json.loads((out / "avispria_provenance.json").read_text())
     assert prov["status"] == "COMPLETED" and prov["engine"]["engine_version"] == "3.6.2"
     assert len(prov["inputs"]) == 6 and all(len(i["sha256"]) == 64 for i in prov["inputs"])
     assert any(o["file"].endswith("odm_orthophoto.tif") for o in prov["outputs"])

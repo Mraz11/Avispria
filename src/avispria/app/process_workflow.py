@@ -37,6 +37,7 @@ from avispria.core.processing import (
     PRESETS,
     PresetName,
     build_options,
+    effective_gsd_cm,
 )
 from avispria.core.safety import Issue
 from avispria.core.version import __version__
@@ -199,8 +200,17 @@ def run_process(
             "this computer cannot process these photos as they are", assessment
         )
 
+    gsd = qa.stats.get("gsd_cm_median")
+    sent_gsd = (
+        None
+        if gsd is None
+        else effective_gsd_cm(gsd, native_mp=native_mp, processing_mp=processing_mp)
+    )
     opts = build_options(
-        req.preset, info.options, electronic_shutter=any(r.shutter == "Electronic" for r in records)
+        req.preset,
+        info.options,
+        electronic_shutter=any(r.shutter == "Electronic" for r in records),
+        gsd_cm=sent_gsd,
     )
     rep.info(f"preset '{req.preset}': {PRESETS[req.preset].description}")
     for note in opts.notes:

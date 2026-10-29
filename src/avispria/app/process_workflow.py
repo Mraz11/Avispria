@@ -29,6 +29,7 @@ from avispria.adapters.engine import (
 from avispria.adapters.photos import photo_files, scan_photos
 from avispria.adapters.resize import resize_photo
 from avispria.app.capture_workflow import camera_chooser
+from avispria.app.result_quality import read_stats, report_quality
 from avispria.core.capture import analyse_capture
 from avispria.core.feasibility import Assessment, JobSpec, SystemSpec, assess, gb
 from avispria.core.processing import (
@@ -39,6 +40,7 @@ from avispria.core.processing import (
     build_options,
     effective_gsd_cm,
 )
+from avispria.core.quality import ReconstructionSummary, summarize_reconstruction
 from avispria.core.safety import Issue
 from avispria.core.version import __version__
 
@@ -237,6 +239,7 @@ def run_process(
         outcome = wait(task, rep.progress, interval=req.poll_s or DEFAULT_POLL_S)
         zip_path = results_dir = None
         outputs: list[Path] = []
+        reconstruction: ReconstructionSummary | None = None
         if outcome.completed:
             rep.step("Downloading results")
             downloaded = download_results(task, req.out_dir)
@@ -244,6 +247,12 @@ def run_process(
             downloaded.replace(zip_path)
             results_dir = req.out_dir / "results"
             outputs = _extract(zip_path, results_dir)
+            stats = read_stats(results_dir)
+            if stats is not None:
+                rep.step("Result quality")
+                # compare with the GSD of the photos as uploaded (after any resizing)
+                reconstruction = summarize_reconstruction(stats, sent_gsd)
+                report_quality(reconstruction, rep.info, rep.warn)
     finally:
         shutil.rmtree(upload_dir, ignore_errors=True)
 
@@ -262,6 +271,9 @@ def run_process(
         "resize_mp": req.resize_mp,
         "system": asdict(system),
         "assessment": {"verdict": assessment.verdict, "ram_gb": assessment.ram_gb},
+        "reconstruction": None
+        if reconstruction is None
+        else asdict(reconstruction) | {"points_per_m2": reconstruction.points_per_m2},
         "capture_qa": {
             "advisory": True,
             "stats": qa.stats,

@@ -1,0 +1,40 @@
+{
+  "_provenance": "Trimmed copy of odm_report/stats.json from ODX 3.8.4 (WebODM 3.3.1 native app) processing the public ODM 'brighton_beach' dataset (DJI Phantom 3, FC300S) with Avispria's standard preset, 2026-10-29. Histograms and file paths removed.",
+  "processing_statistics": {
+    "area": 7058.621140549629
+  },
+  "reconstruction_statistics": {
+    "components": 1,
+    "has_gps": true,
+    "has_gcp": false,
+    "initial_points_count": 11509,
+    "initial_shots_count": 18,
+    "reconstructed_points_count": 11311,
+    "reconstructed_shots_count": 18,
+    "observations_count": 34343,
+    "average_track_length": 3.0362479002740694,
+    "average_track_length_over_two": 4.073779193205945,
+    "reprojection_error_normalized": 0.13396787622759307,
+    "reprojection_error_pixels": 0.8273543344908864,
+    "reprojection_error_angular": 0.0003061459272821992
+  },
+  "gps_errors": {
+    "average_error": 0.6639364311989229,
+    "ce90": 0.8931692080613405
+  },
+  "point_cloud_statistics": {
+    "stats": {
+      "statistic": [
+        {
+          "name": "X",
+          "count": 1412664
+        }
+      ]
+    }
+  },
+  "odm_processing_statistics": {
+    "total_time": 461.949842,
+    "total_time_human": "7.0m:42.0s",
+    "average_gsd": 1.5900510328237643
+  }
+}

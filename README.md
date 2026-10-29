@@ -39,7 +39,9 @@ Read [DISCLAIMER.md](DISCLAIMER.md) before using any output near an aircraft.
   token is read from the running engine and never printed or stored.
 - `avispria process` checks a photo folder, confirms this computer can handle it,
   resizes JPEGs to 12 MP (keeping GPS and DJI metadata), uploads, follows progress,
-  downloads the orthophoto, surface model and point cloud, and writes a provenance
+  downloads the orthophoto, surface model and point cloud, summarises the result quality
+  in plain language (photos placed, reprojection error, GPS agreement, point density,
+  measured vs estimated resolution), and writes a provenance
   record with checksums of every input and output. Presets: fast, standard, detailed.
 
 ## Install (Windows, PowerShell)

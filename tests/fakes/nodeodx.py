@@ -9,6 +9,7 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 INFO = {
@@ -73,6 +74,13 @@ def results_zip() -> bytes:
         z.writestr("odm_dem/dsm.tif", b"fake dsm")
         z.writestr("odm_georeferencing/odm_georeferenced_model.laz", b"fake laz")
         z.writestr("log.json", b"{}")
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "fixtures"
+            / "odx"
+            / "stats_brighton_standard.json"
+        )
+        z.writestr("odm_report/stats.json", fixture.read_bytes())
     return buf.getvalue()
 
 

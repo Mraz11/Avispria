@@ -67,9 +67,20 @@ def test_process_end_to_end(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     # photos were halved (0.48 -> 0.12 MP), so the uploaded GSD is twice the native one
     assert resolution == pytest.approx(native_gsd * 2, abs=0.1)
     assert "resized 6 of 6 photos" in result.output
+    assert "Result quality" in result.output
+    assert "photos placed in the 3D model   18 of 18" in result.output
+    assert "reprojection error              0.83 px" in result.output
+    # the synthetic 800x600 test photos suggest ~22 cm/px but the fixture's real engine
+    # statistics measured 1.59: the mismatch warning must reach the screen and the record
+    assert "RQ004" in result.output
     assert (out / "results" / "odm_orthophoto" / "odm_orthophoto.tif").exists()
     assert (out / "flight_all.zip").exists() and not (out / ".avispria-upload").exists()
     assert prov["status"] == "COMPLETED" and prov["engine"]["engine_version"] == "3.6.2"
+    rec = prov["reconstruction"]
+    assert rec["photos_placed"] == 18 and rec["reprojection_px"] == pytest.approx(0.827, abs=0.001)
+    assert rec["points_per_m2"] == pytest.approx(200.1, abs=0.2)
+    assert [i["code"] for i in rec["issues"]] == ["RQ004"]
+    assert rec["gsd_cm_estimated"] == pytest.approx(native_gsd * 2, abs=0.01)
     assert len(prov["inputs"]) == 6 and all(len(i["sha256"]) == 64 for i in prov["inputs"])
     assert any(o["file"].endswith("odm_orthophoto.tif") for o in prov["outputs"])
     assert "hidden-token-123" not in (out / "avispria_provenance.json").read_text()
@@ -134,3 +145,44 @@ def test_qa_that_cannot_assess_is_only_a_warning(
     assert prov["capture_qa"]["advisory"] is True
     assert {i["level"] for i in prov["capture_qa"]["issues"]} == {"warning"}
     assert (out / "plain_all.zip").exists()
+
+
+class _ListReporter:
+    def __init__(self) -> None:
+        self.lines: list[str] = []
+
+    def step(self, title: str) -> None: ...
+    def info(self, text: str) -> None:
+        self.lines.append(text)
+
+    def warn(self, text: str) -> None:
+        self.lines.append("! " + text)
+
+    def upload(self, percent: float) -> None: ...
+    def progress(self, percent: float, status: str) -> None: ...
+
+
+def test_quality_report_for_a_good_run_says_so() -> None:
+    from avispria.app.result_quality import report_quality
+    from avispria.core.quality import summarize_reconstruction
+
+    fixture = (
+        Path(__file__).resolve().parents[1] / "fixtures" / "odx" / "stats_brighton_standard.json"
+    )
+    summary = summarize_reconstruction(json.loads(fixture.read_text()), 1.89)
+    rep = _ListReporter()
+    report_quality(summary, rep.info, rep.warn)
+    assert "ground resolution               1.59 cm/px measured (estimated 1.89)" in rep.lines
+    assert "point cloud                     1.41 million points (about 200 per m2)" in rep.lines
+    assert rep.lines[-1] == "no problems found in the reconstruction"
+
+
+def test_stats_file_problems_never_break_processing(tmp_path: Path) -> None:
+    from avispria.app.result_quality import read_stats
+
+    assert read_stats(tmp_path) is None  # no file
+    (tmp_path / "odm_report").mkdir()
+    (tmp_path / "odm_report" / "stats.json").write_text("{not json")
+    assert read_stats(tmp_path) is None  # corrupt
+    (tmp_path / "odm_report" / "stats.json").write_text("[1, 2]")
+    assert read_stats(tmp_path) is None  # wrong shape

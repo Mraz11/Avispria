@@ -123,9 +123,16 @@ def _engine(
     if url is None:
         local = find_node()
         if local is None:
-            raise ProcessBlockedError("no processing engine is running; start WebODM and try again")
+            raise ProcessBlockedError(
+                "no processing engine was found. Start WebODM (its Windows app, or its Docker "
+                "version, which listens at http://localhost:3000), or give the engine address "
+                "in the advanced settings"
+            )
         url, token = local.url, token or local.token  # type: ignore[attr-defined]
-        rep.info(f"using WebODM's local engine at {url} (token read from the running engine)")
+        if local.pid:  # type: ignore[attr-defined]
+            rep.info(f"using WebODM's local engine at {url} (token read from the running engine)")
+        else:
+            rep.info(f"using the processing node at {url}")
     node = connect(url, token)
     info = describe(node)
     rep.info(f"{info.engine} {info.engine_version}, {info.cpu_cores or '?'} cores")
@@ -142,7 +149,7 @@ def run_process(
     find_node: Callable[[], object] | None = None,
 ) -> ProcessOutcome:
     probe = probe or system_probe.probe_system
-    find_node = find_node or system_probe.find_local_node
+    find_node = find_node or system_probe.find_engine
     started = time.time()
     name = req.name or task_name(req.folder)
 

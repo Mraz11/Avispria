@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Keeps the field page working offline. The asset list and BUILD are written by
 // scripts/field_page.py: run it after changing any file of the page.
-const BUILD = "32428d300cd2";
+const BUILD = "a3e5c32ae2a2";
 const CACHE = `avispria-field-${BUILD}`;
 // BEGIN GENERATED ASSETS
 const ASSETS = [

@@ -25,8 +25,10 @@
   charts take a Palette and redraw on toggle (widgets.echart(builder)); the browser announces its theme
   via the `avispria_theme` event, the server never awaits JS replies (they hang under the simulated user).
   Phone page: css/theme.css and js/theme.js are GENERATED from theme.py by scripts/field_page.py.
-  Logo: branding/ + scripts/make_branding.py (cut-out, dark variant, icons). LOGO LICENCE UNDECIDED
-  (branding/README.md). NOT verified: how either interface looks in a real browser (previews of the phone
+  Logo: designed by the founder, coloured with an AI tool; branding/ + scripts/make_branding.py
+  (cut-out, the navy X REDRAWN AS A DRONE - rings variant A chosen by the founder because the original X
+  read as a windmill; test counts 4 rotor openings + camera hole; dark variant, icons). LOGO LICENCE
+  UNDECIDED (branding/README.md). NOT verified: how either interface looks in a real browser (previews of the phone
   page were rendered with WeasyPrint, approximate). Test pitfalls: never `from main import ...` in a
   NiceGUI test (it runs ui.run); patch objects, not dotted paths, after page tests; type() appends.
 - Phone field page (field-page/, PWA, no build step, no dependencies): checklists, calculators
@@ -56,6 +58,13 @@
   own test mode), requests every screen and checks it listens on 127.0.0.1 only.
   NOT verified: how it looks in a real browser, the Windows-only parts (drive buttons in the
   folder browser, "Open the folder"), no persistent settings, prepare-copy not in the UI.
+- Make maps engine discovery: system_probe.find_engine() = the Windows app's nodeodx PROCESS, else NodeODX at
+  its standard address http://localhost:3000 without a token (Docker; `docker run -p 3000:3000
+  opendronemap/nodeodm`); the screen has optional Engine address/token (Advanced). ONLY the Windows app
+  route has been tested with real WebODM; macOS/Linux/Docker is untested (and Apple Silicon needs an ARM
+  image). Launchers: Start-Avispria.bat (Windows), start-avispria.sh + Start-Avispria.command (Linux/macOS;
+  keep the executable bit and LF endings; tested). README rewritten with install steps per OS;
+  tests/test_docs.py keeps it in step with the CLI.
 - Terrain-aware capture QA: `core/ground.py` (height above the surface per photo; modes
   `takeoff` = DEM differences only, for any external DEM; `absolute` = photo altitude minus
   DEM, only when the DEM shares the photos' height reference, e.g. the engine's own DSM, with a

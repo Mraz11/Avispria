@@ -50,6 +50,8 @@ class ProcessForm:
     recursive: bool = False
     photo_size: str = "12.2"  # a key of PHOTO_SIZES
     force: bool = False  # start even if this computer looks too small
+    engine_url: str = ""  # empty: find WebODM's engine by itself
+    engine_token: str = ""  # empty: read from the running engine, or none needed
 
 
 @dataclass(frozen=True)
@@ -93,6 +95,11 @@ def build_request(form: ProcessForm, cancel: threading.Event | None = None) -> P
         raise ProcessFormError(
             "Save the results outside the photo folder, so they are never mistaken for photos."
         )
+    engine_url = form.engine_url.strip()
+    if engine_url and not engine_url.lower().startswith(("http://", "https://")):
+        raise ProcessFormError(
+            "The engine address should look like http://localhost:3000 (starting with http://)."
+        )
     return ProcessRequest(
         folder=folder,
         out_dir=out_dir,
@@ -100,6 +107,8 @@ def build_request(form: ProcessForm, cancel: threading.Event | None = None) -> P
         recursive=form.recursive,
         resize_mp=_photo_size_mp(form),
         force=form.force,
+        url=engine_url or None,
+        token=form.engine_token.strip() or None,
         cancel=cancel,
     )
 

@@ -148,3 +148,18 @@ def test_a_job_that_does_not_fit_comes_back_blocked_with_alternatives(
         patch_machine(monkeypatch, port, pc=TINY)
         forced = execute_process(ProcessForm(str(folder), force=True), Quiet())
     assert forced.outcome is not None and state.uploads == 6
+
+
+def test_an_engine_address_and_token_are_passed_on_and_checked(tmp_path: Path) -> None:
+    folder = photos(tmp_path)
+    request = build_request(
+        ProcessForm(str(folder), engine_url=" http://nas.local:3000 ", engine_token=" abc ")
+    )
+    assert request.url == "http://nas.local:3000" and request.token == "abc"
+    default = build_request(ProcessForm(str(folder)))
+    assert default.url is None and default.token is None  # empty: find the engine by itself
+    with pytest.raises(ProcessFormError, match=r"look like http://localhost:3000"):
+        build_request(ProcessForm(str(folder), engine_url="localhost:3000"))
+    assert build_request(
+        ProcessForm(str(folder), engine_url="HTTPS://engine.example:3000")
+    ).url.startswith("HTTPS")  # type: ignore[union-attr]

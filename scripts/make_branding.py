@@ -3,14 +3,17 @@
 """Make every logo file from the original picture (``branding/logo-source.jpg``).
 
 The original has a pale background. This cuts the logo out (with clean, halo-free edges),
-makes a dark-mode variant (the navy parts become light, so the X shows on a dark page) and
-writes the sizes the screens, the browser tab and the phone's home screen need.
+redraws its navy X as a drone seen from above (a body, four arms and four separate rotors: the
+original X reads as a windmill), makes a dark-mode variant (the navy parts become light, so the
+drone shows on a dark page) and writes the sizes the screens, the browser tab and the phone's home
+screen need. The tree and the mountains are left exactly as designed.
 
 Run ``python scripts/make_branding.py`` to recreate the files. Needs numpy and Pillow.
 """
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import numpy as np
@@ -101,6 +104,72 @@ def cut_out(source: Image.Image) -> Image.Image:
     return image.crop(image.getchannel("A").point(lambda v: 255 if v > 6 else 0).getbbox())
 
 
+def _navy_mask(arr: np.ndarray, minimum_alpha: int) -> np.ndarray:
+    r, g, b, a = (arr[..., i] for i in range(4))
+    return (b > r + 18) & (0.2126 * r + 0.7152 * g + 0.0722 * b < 120) & (a > minimum_alpha)
+
+
+def redraw_x_as_drone(logo: Image.Image) -> Image.Image:
+    """Replace the navy X by a drone seen from above, the same size and in the same colour.
+
+    The hub and the reach of the old X are measured from the picture, and the drone is drawn in
+    proportion to them: four open rotors on thin arms around a small body with a camera hole.
+    """
+    arr = np.asarray(logo).astype(int)
+    solid = _navy_mask(arr, 200)
+    ys, xs = np.nonzero(solid)
+    hub = (xs.mean(), ys.mean())
+    # how far the old X reaches from its hub: the nearer side each way, so nothing is cut off
+    dx = min(hub[0] - xs.min(), xs.max() - hub[0])
+    dy = min(hub[1] - ys.min(), ys.max() - hub[1])
+    reach = math.hypot(dx, dy)
+    colour = (*(int(np.median(arr[..., c][solid])) for c in range(3)), 255)
+    # erase the old X (a little beyond its edges, to remove the soft border too)
+    wide = _navy_mask(arr, 60)
+    grown = (
+        np.asarray(Image.fromarray((wide * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(7)))
+        > 0
+    )
+    erased = arr.copy()
+    erased[grown, 3] = 0
+    base = Image.fromarray(erased.astype(np.uint8), "RGBA")
+
+    ss = 4  # draw large, then shrink: smooth edges
+    layer = Image.new("RGBA", (logo.width * ss, logo.height * ss), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(layer)
+    arm, body, hole = 0.074 * reach, 0.147 * reach, 0.054 * reach
+    ring, ring_width = 0.196 * reach, 0.059 * reach
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            # each rotor's outer edge touches the old X's outline but never crosses it
+            cx, cy = hub[0] + sx * (dx - ring), hub[1] + sy * (dy - ring)
+            gap = math.hypot(cx - hub[0], cy - hub[1])
+            along = (gap - (ring - ring_width)) / gap  # the arm stops where the rotor ring begins
+            draw.line(
+                [
+                    (hub[0] * ss, hub[1] * ss),
+                    ((hub[0] + (cx - hub[0]) * along) * ss, (hub[1] + (cy - hub[1]) * along) * ss),
+                ],
+                fill=colour,
+                width=round(arm * ss),
+            )
+            draw.ellipse(
+                [(cx - ring) * ss, (cy - ring) * ss, (cx + ring) * ss, (cy + ring) * ss],
+                outline=colour,
+                width=round(ring_width * ss),
+            )
+    draw.ellipse(
+        [(hub[0] - body) * ss, (hub[1] - body) * ss, (hub[0] + body) * ss, (hub[1] + body) * ss],
+        fill=colour,
+    )
+    draw.ellipse(
+        [(hub[0] - hole) * ss, (hub[1] - hole) * ss, (hub[0] + hole) * ss, (hub[1] + hole) * ss],
+        fill=(0, 0, 0, 0),
+    )
+    base.alpha_composite(layer.resize(logo.size, Image.Resampling.LANCZOS))
+    return base
+
+
 def dark_variant(logo: Image.Image) -> Image.Image:
     """The same logo with the navy parts light, for dark backgrounds (green and terracotta stay)."""
     arr = np.asarray(logo).astype(np.float32)
@@ -141,7 +210,7 @@ def save_small(image: Image.Image, path: Path) -> None:
 
 
 def main() -> None:
-    logo = cut_out(Image.open(SOURCE))
+    logo = redraw_x_as_drone(cut_out(Image.open(SOURCE)))
     dark = dark_variant(logo)
     logo.save(ROOT / "branding" / "logo.png", optimize=True)  # the full-quality masters
     dark.save(ROOT / "branding" / "logo-dark.png", optimize=True)

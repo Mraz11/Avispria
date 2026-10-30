@@ -10,6 +10,7 @@ from typing import ClassVar
 
 import pytest
 
+from avispria.adapters import system_probe
 from avispria.adapters.system_probe import probe_engines, probe_system
 
 
@@ -266,3 +267,40 @@ def test_token_protected_node_is_recognised(token_node: int) -> None:
     assert locked.reachable and locked.needs_token
     unlocked = probe_node(f"http://127.0.0.1:{token_node}", token="secret", timeout=2)
     assert not unlocked.needs_token and "odx 3.6.2" in unlocked.detail
+
+
+def test_the_standard_address_is_tried_when_there_is_no_nodeodx_program(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """WebODM's Docker setup (the usual one on Linux and macOS) has no nodeodx program to find."""
+    from fakes.nodeodx import fake_engine
+
+    with fake_engine(None) as (port, _):  # an engine that needs no token, as the Docker one
+        found = system_probe.find_default_node(f"http://127.0.0.1:{port}")
+    assert found is not None and found.url == f"http://127.0.0.1:{port}"
+    assert found.token is None and found.pid == 0 and found.odx_path is None
+
+
+def test_nothing_at_the_standard_address_means_no_engine() -> None:
+    assert (
+        system_probe.find_default_node("http://127.0.0.1:9", timeout=0.3) is None
+    )  # nothing listens
+
+
+def test_an_engine_that_needs_a_token_is_not_used_without_one() -> None:
+    from fakes.nodeodx import fake_engine
+
+    with fake_engine("s3cret") as (port, _):
+        assert system_probe.find_default_node(f"http://127.0.0.1:{port}") is None
+
+
+def test_find_engine_prefers_the_running_program_and_falls_back_to_the_standard_address(
+    monkeypatch,  # type: ignore[no-untyped-def]
+) -> None:
+    program = system_probe.LocalNode("http://127.0.0.1:29301", "tok", 42, None)
+    standard = system_probe.LocalNode("http://localhost:3000", None, 0, None)
+    monkeypatch.setattr(system_probe, "find_default_node", lambda *a, **k: standard)
+    monkeypatch.setattr(system_probe, "find_local_node", lambda: program)
+    assert system_probe.find_engine() is program  # the Windows app's own engine first
+    monkeypatch.setattr(system_probe, "find_local_node", lambda: None)
+    assert system_probe.find_engine() is standard
+    monkeypatch.setattr(system_probe, "find_default_node", lambda *a, **k: None)
+    assert system_probe.find_engine() is None

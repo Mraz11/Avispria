@@ -27,7 +27,7 @@ def engine(
 ) -> None:
     """Find the processing engine (NodeODX), connect, and show what it supports."""
     if url is None:
-        local = system_probe.find_local_node()
+        local = system_probe.find_engine()
         if local is None:
             typer.secho("No processing engine is running on this computer.", fg=typer.colors.RED)
             typer.echo("Start WebODM (it starts its engine), then run `avispria engine` again.")
@@ -36,7 +36,11 @@ def engine(
         if token is None:
             token = local.token
         source = "read from the running engine (kept in memory only)"
-        typer.echo(f"Engine found   nodeodx (pid {local.pid}) at {url}")
+        typer.echo(
+            f"Engine found   nodeodx (pid {local.pid}) at {url}"
+            if local.pid
+            else f"Engine found   processing node at {url}"
+        )
     else:
         source = "given on the command line"
         typer.echo(f"Engine         {url}")

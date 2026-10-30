@@ -114,6 +114,29 @@ class LocalNode:
     odx_path: str | None
 
 
+DOCKER_NODE_URL = "http://localhost:3000"  # NodeODX's standard address (WebODM's Docker setup)
+
+
+def find_default_node(url: str = DOCKER_NODE_URL, timeout: float = 1.5) -> LocalNode | None:
+    """NodeODX answering at its standard address, if it needs no token.
+
+    WebODM's Docker setup, the usual one on Linux and macOS, runs the engine in a container, so
+    there is no ``nodeodx`` program to find; it listens on port 3000 without a token.
+    """
+    try:
+        status = _probe_node(url.rstrip("/") + "/info", timeout)
+    except PROBE_ERRORS:
+        return None
+    if not status.reachable or status.needs_token:
+        return None
+    return LocalNode(url, None, 0, None)
+
+
+def find_engine() -> LocalNode | None:
+    """The engine WebODM runs here: the Windows app's own program, else the standard address."""
+    return find_local_node() or find_default_node()
+
+
 def parse_node_cmdline(args: list[str]) -> tuple[int, str | None, str | None]:
     """(port, token, odx_path) from a NodeODX command line (`--x v` or `--x=v`)."""
     values: dict[str, str] = {}

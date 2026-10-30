@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "check_file_length.py"
 
 
@@ -57,3 +59,50 @@ def test_the_windows_launcher_starts_the_interface_and_explains_a_missing_uv() -
     assert "uv run avispria ui" in launcher
     assert "docs.astral.sh/uv" in launcher  # tells the user what to install if uv is missing
     assert 'cd /d "%~dp0"' in launcher  # works wherever the folder is, and from a double-click
+
+
+UNIX_LAUNCHERS = ("start-avispria.sh", "Start-Avispria.command")
+
+
+def test_the_unix_launchers_start_the_interface_and_explain_a_missing_uv() -> None:
+    root = Path(__file__).resolve().parent.parent
+    for name in UNIX_LAUNCHERS:
+        text = (root / name).read_text(encoding="utf-8")
+        assert text.startswith("#!/bin/sh\n"), name
+        assert "\r" not in text, f"{name}: Windows line endings would break the shebang"
+        assert 'cd "$(dirname "$0")"' in text, name  # works wherever the folder is
+    main = (root / "start-avispria.sh").read_text(encoding="utf-8")
+    assert "uv run avispria ui" in main
+    assert (
+        "curl -LsSf https://astral.sh/uv/install.sh | sh" in main
+    )  # what to install if uv is missing
+    assert "start-avispria.sh" in (root / "Start-Avispria.command").read_text(encoding="utf-8")
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="shell scripts run on Linux and macOS")
+def test_the_unix_launchers_are_executable_and_well_formed() -> None:
+    import os
+
+    root = Path(__file__).resolve().parent.parent
+    for name in UNIX_LAUNCHERS:
+        assert os.access(root / name, os.X_OK), f"{name} must be executable (chmod +x)"
+        assert subprocess.run(["sh", "-n", str(root / name)], check=False).returncode == 0, name
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="shell scripts run on Linux and macOS")
+def test_a_missing_uv_gets_install_instructions_instead_of_an_error() -> None:
+    import shutil
+
+    if shutil.which("uv", path="/usr/bin:/bin"):
+        pytest.skip("uv is installed system-wide here")
+    root = Path(__file__).resolve().parent.parent
+    result = subprocess.run(
+        ["/bin/sh", str(root / "start-avispria.sh")],
+        env={"PATH": "/usr/bin:/bin"},
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 1
+    assert "astral.sh/uv/install.sh" in result.stdout and "NEW terminal window" in result.stdout

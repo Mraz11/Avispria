@@ -77,7 +77,7 @@ class FakeState:
     """What the fake engine received and how the task should end."""
 
     def __init__(
-        self, token: str, outcome: str = "complete", dsm_elevation: float | None = None
+        self, token: str | None, outcome: str = "complete", dsm_elevation: float | None = None
     ) -> None:
         self.token = token
         self.dsm_elevation = dsm_elevation
@@ -124,7 +124,7 @@ def _handler(state: FakeState) -> type[BaseHTTPRequestHandler]:
 
         def _authorised(self) -> bool:
             query = parse_qs(urlparse(self.path).query)
-            if query.get("token", [""])[0] != state.token:
+            if state.token and query.get("token", [""])[0] != state.token:  # empty: no token needed
                 self._send({"error": "Invalid authentication token: token does not match."})
                 return False
             return True
@@ -208,7 +208,7 @@ def fake_nodeodx(token: str = "s3cret", outcome: str = "complete") -> Iterator[i
 
 @contextmanager
 def fake_engine(
-    token: str = "s3cret", outcome: str = "complete", dsm_elevation: float | None = None
+    token: str | None = "s3cret", outcome: str = "complete", dsm_elevation: float | None = None
 ) -> Iterator[tuple[int, FakeState]]:
     from http.server import ThreadingHTTPServer
 

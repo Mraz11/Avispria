@@ -182,3 +182,28 @@ async def test_the_check_screen_leads_here_with_the_photos_filled_in(
     user.find("Make maps from these photos").click()
     await user.should_see("Start making maps", retries=LONG)
     await eventually(lambda: value_of(user, "photos-input") == str(folder))
+
+
+async def test_an_engine_at_another_address_can_be_given(
+    user: User, machine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With no engine to find by itself, the address typed into Advanced is used."""
+    from avispria.app import process_workflow
+
+    folder = survey_photos(tmp_path)
+    with fake_engine("tok") as (port, state):
+        machine(port)  # a computer of the right size ...
+        monkeypatch.setattr(process_workflow.system_probe, "find_local_node", lambda: None)
+        monkeypatch.setattr(
+            process_workflow.system_probe, "find_default_node", lambda *a, **k: None
+        )
+        await user.open("/process")  # ... but nothing to find
+        set_text(user, "photos-input", str(folder))
+        user.find(marker="start-button").click()
+        await user.should_see("no processing engine was found", retries=LONG)
+        await user.should_see("give the engine address")
+        set_text(user, "engine-url-input", f"http://127.0.0.1:{port}")
+        set_text(user, "engine-token-input", "tok")
+        user.find(marker="start-button").click()
+        await user.should_see("Your results", retries=LONG)
+    assert state.uploads == 6

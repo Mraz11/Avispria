@@ -84,6 +84,23 @@ async def process_page() -> None:
                 "12 MP is the usual choice."
             ).classes("text-xs av-muted")
             force = ui.switch("Start even if this computer looks too small").mark("force-switch")
+            ui.label(
+                "Engine: leave these empty and Avispria finds WebODM's engine by itself (the "
+                "Windows app, or the Docker version at http://localhost:3000). Fill them in only "
+                "for an engine somewhere else."
+            ).classes("text-xs av-muted")
+            engine_url = (
+                ui.input("Engine address (optional)", placeholder="http://localhost:3000")
+                .props("outlined dense")
+                .classes("w-80")
+                .mark("engine-url-input")
+            )
+            engine_token = (
+                ui.input("Engine access token (optional)")
+                .props("outlined dense type=password")
+                .classes("w-80")
+                .mark("engine-token-input")
+            )
         with ui.row().classes("gap-3 items-center"):
             check_button = (
                 ui.button("Check this computer for this job", icon="memory", color="secondary")
@@ -113,6 +130,8 @@ async def process_page() -> None:
             recursive=bool(recursive.value),
             photo_size=str(size.value),
             force=bool(force.value),
+            engine_url=engine_url.value or "",
+            engine_token=engine_token.value or "",
         )
 
     async def check() -> None:

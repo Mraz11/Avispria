@@ -115,17 +115,33 @@ def run_qa(
     recursive: bool = False,
     dem_path: Path | None = None,
     takeoff: tuple[float, float] | None = None,
+    ground_elevation_m: float | None = None,
 ) -> tuple[CaptureReport, list[tuple[str, str]], GroundHeights | None]:
-    """Capture QA; with ``dem_path`` the terrain under each photo is taken into account."""
+    """Capture QA; with ``dem_path`` the terrain under each photo is taken into account.
+
+    ``ground_elevation_m`` (height of the ground above sea level, for a flat site) gives a height
+    above the ground to photos that record only a height above sea level (drones other than DJI):
+    the GPS height minus the ground height. An elevation model, if given, takes precedence.
+    """
     records, skipped = scan_photos(folder, recursive=recursive)
     notes: list[Issue] = []
     ground = None if dem_path is None else terrain_heights(records, dem_path, takeoff)
+    heights: dict[str, float] = {}
+    if ground_elevation_m is not None:
+        heights = {
+            r.name: r.absolute_altitude_m - ground_elevation_m
+            for r in records
+            if r.relative_altitude_m is None and r.absolute_altitude_m is not None
+        }
+    if ground is not None:
+        heights.update(ground.agl_m)
     report = analyse_capture(
-        records,
-        camera_chooser(profile, notes),
-        thresholds,
-        agl_m=None if ground is None else ground.agl_m,
+        records, camera_chooser(profile, notes), thresholds, agl_m=heights or None
     )
+    if ground_elevation_m is not None and ground is None:
+        report.stats["ground_elev_m"] = (
+            ground_elevation_m  # so the screens can say where heights come from
+        )
     report.issues.extend(notes)
     if ground is not None:
         report.issues.extend(ground.issues)

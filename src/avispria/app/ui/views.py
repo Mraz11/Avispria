@@ -191,7 +191,9 @@ def qa_tiles(report: CaptureReport) -> list[Tile]:
         Tile(
             "Height",
             f"{s['altitude_m_median']:.0f} m",
-            "above the surface (terrain used)"
+            f"above the ground (taken as {s['ground_elev_m']:.1f} m above sea level)"
+            if "ground_elev_m" in s
+            else "above the surface (terrain used)"
             if s.get("terrain_aware")
             else "above the takeoff point (flat ground assumed)",
         ),

@@ -41,6 +41,15 @@ def qa(
             "from these same photos)"
         ),
     ] = None,
+    ground_elev: Annotated[
+        float | None,
+        typer.Option(
+            "--ground-elev",
+            help="Height of the ground above sea level in metres, for a flat site. For drones "
+            "that record only a height above sea level (not DJI): the height above the ground "
+            "is the photo's GPS height minus this",
+        ),
+    ] = None,
 ) -> None:
     """Check overlap, coverage, blur, gimbal, altitude and timing of survey photos."""
     if takeoff is not None and dem is None:
@@ -56,7 +65,12 @@ def qa(
             raise typer.BadParameter(f"unknown drone {drone!r}; see `avispria drones`")
     try:
         report, skipped, ground = run_qa(
-            folder, profile, recursive=recursive, dem_path=dem, takeoff=takeoff_lonlat
+            folder,
+            profile,
+            recursive=recursive,
+            dem_path=dem,
+            takeoff=takeoff_lonlat,
+            ground_elevation_m=ground_elev,
         )
     except PlanningError as exc:
         typer.secho(f"Cannot use the elevation model: {exc}", fg=typer.colors.RED)
@@ -75,7 +89,12 @@ def qa(
     for name, reason in skipped:
         typer.secho(f"  skipped {name}: {reason}", fg=typer.colors.YELLOW)
     if "gsd_cm_median" in s:
-        above = "the surface" if s["terrain_aware"] else "takeoff"
+        if "ground_elev_m" in s:  # set only when no elevation model was given
+            above = f"the ground (taken as {s['ground_elev_m']:.1f} m above sea level)"
+        elif s["terrain_aware"]:
+            above = "the surface"
+        else:
+            above = "takeoff"
         typer.echo(
             f"height {s['altitude_m_median']:.1f} m above {above}   "
             f"GSD {s['gsd_cm_median']:.2f} cm/px"

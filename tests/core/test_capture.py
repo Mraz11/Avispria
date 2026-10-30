@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from avispria.core.camera import CameraProfile, footprint_m
+from avispria.core.camera import CameraProfile, footprint_m, gsd_m
 from avispria.core.capture import QaThresholds, analyse_capture
 from avispria.core.photo import PhotoRecord
 
@@ -230,3 +230,61 @@ def test_neighbour_search_matches_brute_force() -> None:
         )
         assert row.best_overlap == pytest.approx(best[0], abs=1e-12)
         assert row.best_neighbour == photos[-best[1]].name
+
+
+def sea_level_only(photos: list, altitude: float = 513.0) -> list:  # type: ignore[type-arg]
+    """Photos as an Autel records them: a height above sea level, none above takeoff."""
+    return [
+        replace(
+            p,
+            relative_altitude_m=None,
+            absolute_altitude_m=altitude + 0.2 * i,
+            gimbal_pitch_deg=None,
+        )
+        for i, p in enumerate(photos)
+    ]
+
+
+def test_photos_with_only_a_sea_level_height_are_used_once_the_height_above_ground_is_known() -> (
+    None
+):
+    w, h = footprint_m(CAM, 60.0)
+    photos = sea_level_only(grid(rows=6, cols=3, dx=w * 0.3, dy=h * 0.2))
+    heights = {p.name: 60.0 for p in photos}  # e.g. the GPS height minus the ground height
+    rep = analyse_capture(photos, lambda r: CAM, agl_m=heights)
+    assert (
+        rep.stats["photos_used"] == 18 and "QA015" not in codes(rep) and "QA007" not in codes(rep)
+    )
+    assert rep.stats["gsd_cm_median"] == pytest.approx(gsd_m(CAM, 60.0) * 100, abs=0.001)
+    assert rep.stats["front_overlap_median"] == pytest.approx(0.80, abs=0.02)
+
+
+def test_no_height_above_the_ground_gets_its_own_accurate_message() -> None:
+    w, h = footprint_m(CAM, 60.0)
+    photos = sea_level_only(grid(rows=6, cols=3, dx=w * 0.3, dy=h * 0.2))
+    rep = analyse_capture(photos, lambda r: CAM)
+    assert "QA015" in codes(rep) and "QA007" not in codes(
+        rep
+    )  # the position is there; the height is not
+    message = next(i.message for i in rep.issues if i.code == "QA015")
+    assert "above sea level" in message and "513-516" in message  # what they do have
+    assert rep.stats["photos_used"] == 0 and "QA009" in codes(rep)
+
+
+def test_a_missing_position_is_still_reported_as_a_missing_position() -> None:
+    w, h = footprint_m(CAM, 60.0)
+    photos = grid(rows=6, cols=3, dx=w * 0.3, dy=h * 0.2)
+    photos[0] = replace(photos[0], lat=None, lon=None)
+    rep = analyse_capture(photos, lambda r: CAM)
+    assert "QA007" in codes(rep) and "QA015" not in codes(rep)
+    assert rep.stats["photos_used"] == 17
+
+
+def test_an_unrecorded_camera_angle_is_said_aloud_not_silently_assumed() -> None:
+    w, h = footprint_m(CAM, 60.0)
+    photos = grid(rows=6, cols=3, dx=w * 0.3, dy=h * 0.2)
+    assert "QA016" not in codes(analyse_capture(photos, lambda r: CAM))  # DJI photos record it
+    unknown = [replace(p, gimbal_pitch_deg=None) for p in photos]
+    rep = analyse_capture(unknown, lambda r: CAM)
+    assert "QA016" in codes(rep) and rep.stats["photos_used"] == 18  # used, assuming straight down
+    assert "straight down" in next(i.message for i in rep.issues if i.code == "QA016")

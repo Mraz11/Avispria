@@ -191,6 +191,10 @@ Examples (on Windows write paths with backslashes):
     uv run avispria doctor photos/
     uv run avispria process photos/ --out results/ --preset standard
 
+Photos from a drone other than DJI usually record only a height above sea level, not the height above
+the ground. On a flat site tell `qa` where the ground is (`--ground-elev 463.7`, in metres above sea
+level); on a site with hills use `--dem` instead. The window interface has the same field.
+
 Planning over trees on flat ground: add `--flat --surface-height 25` (the canopy height in metres), so
 the treetops, not the ground, get the height you asked for.
 

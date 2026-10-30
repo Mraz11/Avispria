@@ -40,3 +40,13 @@ def parse_shutter_text(text: str) -> float:
     if value <= 0 or value > 1:
         raise ValueError(hint)
     return value
+
+
+def parse_number(text: str) -> float | None:
+    """A plain number typed by a person (a comma as decimal mark is fine); None if it is not one."""
+    cleaned = text.strip().replace(",", ".")
+    try:
+        value = float(cleaned)
+    except ValueError:
+        return None
+    return value if value == value and abs(value) != float("inf") else None

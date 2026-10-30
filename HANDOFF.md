@@ -65,6 +65,13 @@
   image). Launchers: Start-Avispria.bat (Windows), start-avispria.sh + Start-Avispria.command (Linux/macOS;
   keep the executable bit and LF endings; tested). README rewritten with install steps per OS;
   tests/test_docs.py keeps it in step with the CLI.
+- Forest dataset (docs/datasets.md): ODM's helenenschacht (Autel EVO II Pro RTK, 176 photos, 2.4 GB, RAW
+  PHOTOS ONLY, no DSM/DTM). The sandbox (7 GB disk, 3 GB RAM, 1 thread) cannot run photogrammetry, so only
+  the 46 MB of photo HEADERS (range requests) + 6 full photos were fetched. It exposed that QA needed a
+  relative altitude (DJI-only): now a photo has a height if it records one above takeoff OR one was
+  worked out (elevation model, or `qa --ground-elev M` / the Check screen field); QA015 (no height above
+  ground) and QA016 (camera angle not recorded, assumed nadir) added. Finding for later: `process` does not
+  upload ODM's gcp_list.txt (GCP support missing); camera-from-photo labels 19.96 MP as "19mp".
 - Terrain-aware capture QA: `core/ground.py` (height above the surface per photo; modes
   `takeoff` = DEM differences only, for any external DEM; `absolute` = photo altitude minus
   DEM, only when the DEM shares the photos' height reference, e.g. the engine's own DSM, with a

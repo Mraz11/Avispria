@@ -11,7 +11,7 @@ from nicegui import ui
 from avispria.adapters.photos import photo_subfolders
 from avispria.app.capture_workflow import report_csv, run_qa
 from avispria.app.ui.charts import photo_map
-from avispria.app.ui.inputs import parse_latlon_text
+from avispria.app.ui.inputs import parse_latlon_text, parse_number
 from avispria.app.ui.jobs import JobResult, run_job
 from avispria.app.ui.layout import frame
 from avispria.app.ui.state import STATE
@@ -125,6 +125,18 @@ async def check_page() -> None:
                 .classes("w-full")
                 .mark("takeoff-input")
             )
+            ui.label(
+                "Drones other than DJI usually record only a height above sea level, not the "
+                "height above the ground. On a flat site, type the height of the ground above sea "
+                "level here (in metres) and Avispria works out each photo's height above the "
+                "ground from it. For sites with hills use an elevation model instead."
+            ).classes("text-sm av-muted")
+            ground_elev = (
+                ui.input("Height of the ground above sea level (m), flat sites")
+                .props("outlined dense")
+                .classes("w-80")
+                .mark("ground-input")
+            )
         button = ui.button("Check photos", icon="fact_check").props("no-caps size=lg").mark("run")
         results = ui.column().classes("w-full gap-4")
 
@@ -154,6 +166,12 @@ async def check_page() -> None:
                 _problem(results, str(exc))
                 return
             takeoff_lonlat = (lon, lat)
+        ground_m = None
+        if (ground_elev.value or "").strip():
+            ground_m = parse_number(ground_elev.value)
+            if ground_m is None:
+                _problem(results, "The ground height should be a number of metres above sea level.")
+                return
         button.disable()
         with results:
             ui.spinner(size="lg")
@@ -165,6 +183,7 @@ async def check_page() -> None:
             recursive=subfolders.value,
             dem_path=dem_path,
             takeoff=takeoff_lonlat,
+            ground_elevation_m=ground_m,
         )
         button.enable()
         results.clear()

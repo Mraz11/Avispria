@@ -51,8 +51,9 @@ class Footprint:
 
 def height_above(r: PhotoRecord, agl: Mapping[str, float]) -> float:
     """Height above the surface if known (terrain-aware), else above the takeoff point."""
-    assert r.relative_altitude_m is not None
-    return agl.get(r.name, r.relative_altitude_m)
+    height = agl.get(r.name, r.relative_altitude_m)
+    assert height is not None  # the caller keeps only photos that have one of the two
+    return height
 
 
 def local_frame(records: Sequence[PhotoRecord]) -> LocalFrame:
@@ -69,7 +70,7 @@ def footprints_for(
 ) -> list[Footprint]:
     out = []
     for r in records:
-        assert r.lon is not None and r.lat is not None and r.relative_altitude_m is not None
+        assert r.lon is not None and r.lat is not None
         cam = camera_for(r)
         g = gsd_m(cam, height_above(r, agl))
         xs, ys = frame.to_local([r.lon], [r.lat])

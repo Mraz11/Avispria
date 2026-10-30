@@ -51,3 +51,19 @@ def test_bad_shutter_times(text: str) -> None:
 
     with pytest.raises(ValueError, match="like 1/1000"):
         parse_shutter_text(text)
+
+
+@pytest.mark.parametrize(
+    ("text", "value"), [("463.7", 463.7), (" 463,7 ", 463.7), ("-12", -12.0), ("0", 0.0)]
+)
+def test_plain_numbers(text: str, value: float) -> None:
+    from avispria.app.ui.inputs import parse_number
+
+    assert parse_number(text) == value
+
+
+@pytest.mark.parametrize("text", ["", "abc", "12 m", "nan", "inf", "1.2.3"])
+def test_things_that_are_not_numbers(text: str) -> None:
+    from avispria.app.ui.inputs import parse_number
+
+    assert parse_number(text) is None

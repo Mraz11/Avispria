@@ -85,3 +85,21 @@ def machine(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
         monkeypatch.setattr(doctor_module, "probe_engines", lambda: engines)
 
     return install
+
+
+@pytest.fixture
+def autel_folder(tmp_path):  # type: ignore[no-untyped-def]
+    """Twelve photos as an Autel records them: position and height above SEA LEVEL only."""
+    from photobuild import make_exif_only_jpeg
+
+    folder = tmp_path / "autel"
+    folder.mkdir()
+    for i in range(12):
+        make_exif_only_jpeg(
+            folder / f"MAX_{i:04d}.JPG",
+            size=(800, 600),
+            lat=47.6435 + (i % 6) * 0.00008,
+            lon=16.4763 + (i // 6) * 0.00016,
+            altitude_asl=513.1,
+        )
+    return folder

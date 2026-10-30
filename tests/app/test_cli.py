@@ -513,3 +513,29 @@ def test_plan_no_calibrate_keeps_the_old_route(aoi: Path, dem: Path, tmp_path: P
     report = json.loads((tmp_path / "out" / "plan_report.json").read_text())
     assert report["summary"]["flight_reference_m"] == pytest.approx(50.0)
     assert report["summary"]["calibration_steps"] == 1
+
+
+def test_qa_with_a_ground_height_checks_photos_that_record_only_a_sea_level_height(
+    tmp_path: Path,
+) -> None:
+    from photobuild import make_exif_only_jpeg
+
+    folder = tmp_path / "autel"
+    folder.mkdir()
+    for i in range(12):  # 2 x 6 block like a real survey; GPS height 513 m above sea level
+        make_exif_only_jpeg(
+            folder / f"MAX_{i:04d}.JPG",
+            size=(800, 600),
+            lat=47.6435 + (i % 6) * 0.00008,
+            lon=16.4763 + (i // 6) * 0.00016,
+            altitude_asl=513.1,
+        )
+    without = runner.invoke(app, ["qa", str(folder)])
+    assert without.exit_code == 1 and "QA015" in without.output  # told exactly what is missing
+    assert "above sea level" in without.output and "turn location" not in without.output.lower()
+    result = runner.invoke(app, ["qa", str(folder), "--ground-elev", "463.7"])
+    assert result.exit_code == 0, result.output
+    assert "12 found, 12 used" in result.output
+    assert "above the ground (taken as 463.7 m above sea level)" in result.output
+    assert "height 49.4 m" in result.output  # 513.1 - 463.7
+    assert "QA016" in result.output  # the camera angle is not recorded, and that is said

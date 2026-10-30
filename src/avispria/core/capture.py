@@ -89,10 +89,34 @@ def analyse_capture(
     def warn(code: str, message: str, level: Literal["error", "warning"] = "warning") -> None:
         issues.append(Issue(level, code, message))
 
-    missing = [r.name for r in records if None in (r.lat, r.lon, r.relative_altitude_m)]
-    if missing:
-        warn("QA007", f"missing position or altitude metadata: {_names(missing)}")
-    located = [r for r in records if r.name not in missing and (r.relative_altitude_m or 0) > 0]
+    # a photo has a usable height if it records one above takeoff (DJI), or one above the ground
+    # was worked out for it (from an elevation model, or from a ground height the user gave)
+    no_position = [r.name for r in records if r.lat is None or r.lon is None]
+    no_height = [
+        r.name
+        for r in records
+        if r.name not in no_position and r.relative_altitude_m is None and r.name not in agl
+    ]
+    if no_position:
+        warn("QA007", f"missing position metadata (GPS): {_names(no_position)}")
+    if no_height:
+        asl = [
+            r.absolute_altitude_m
+            for r in records
+            if r.name in no_height and r.absolute_altitude_m is not None
+        ]
+        have = (
+            f"; they record a height of {min(asl):.0f}-{max(asl):.0f} m above sea level"
+            if asl
+            else ""
+        )
+        warn("QA015", f"no height above the ground in: {_names(no_height)}{have}")
+    missing = {*no_position, *no_height}
+    located = [
+        r
+        for r in records
+        if r.name not in missing and (agl.get(r.name) or r.relative_altitude_m or 0) > 0
+    ]
     oblique = [
         r.name
         for r in located
@@ -102,6 +126,13 @@ def analyse_capture(
     if oblique:
         warn("QA001", f"gimbal not pointing straight down (excluded): {_names(oblique)}")
     used = [r for r in located if r.name not in oblique]
+    unknown_angle = [r.name for r in used if r.gimbal_pitch_deg is None]
+    if unknown_angle:
+        warn(
+            "QA016",
+            "camera angle not recorded, assumed straight down (check that the camera was "
+            f"level): {_names(unknown_angle)}",
+        )
     stats: dict[str, float] = {"photos_total": len(records), "photos_used": len(used)}
     if len(used) < thr.min_views:
         warn(

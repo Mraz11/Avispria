@@ -140,3 +140,22 @@ async def test_the_details_can_be_saved_as_a_spreadsheet(user: User, photo_folde
     download = await user.download.next()
     assert download.text.splitlines()[0].startswith("photo,gsd_cm")
     assert len(download.text.splitlines()) == 13  # header + 12 photos
+
+
+async def test_photos_without_a_height_above_ground_are_explained_and_fixed_with_the_ground_height(
+    user: User, autel_folder: Path
+) -> None:
+    await user.open("/check")
+    set_text(user, "photos-input", str(autel_folder))
+    user.find(marker="run").click()
+    await user.should_see("Not enough usable photos", retries=100)  # the verdict
+    await user.should_see("No height above the ground in the photos")  # the warning, in plain words
+    await user.should_see("513-513 m above sea level")  # what the photos do record
+    set_text(user, "ground-input", "463.7")
+    user.find(marker="run").click()
+    await user.should_see("12 of 12", retries=100)
+    await user.should_see("above the ground (taken as 463.7 m above sea level)")
+    await user.should_see("Camera angle not recorded")  # said aloud, not silently assumed
+    set_text(user, "ground-input", "high")
+    user.find(marker="run").click()
+    await user.should_see("The ground height should be a number of metres above sea level.")

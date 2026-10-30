@@ -91,6 +91,16 @@ EXPLANATIONS: dict[str, Explanation] = {
         "Some photos overlap the neighbouring flight line by less than 50%.",
         "Space the flight lines closer together (more sideways overlap).",
     ),
+    "QA015": _e(
+        "No height above the ground in the photos",
+        "These photos record where they were taken and a height above sea level, but not how high above the ground or the takeoff point the drone was (DJI drones record this; many other drones do not), so the resolution cannot be worked out.",
+        "Tell Avispria the height of the ground above sea level (for a flat site), or give an elevation model for sites with hills. The height above the ground is then the photo's height above sea level minus the ground's.",
+    ),
+    "QA016": _e(
+        "Camera angle not recorded",
+        "These photos do not say which way the camera was pointing, so Avispria assumed straight down, as for a mapping flight.",
+        "That is fine if you set the camera to look straight down. If you are not sure, check a few photos by eye: tilted photos make the overlap and resolution figures optimistic.",
+    ),
     # ---- results of processing
     "RQ001": _e(
         "Some photos were not used",

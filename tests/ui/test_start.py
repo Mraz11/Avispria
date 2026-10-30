@@ -70,3 +70,26 @@ def test_finding_a_free_port_skips_busy_ones() -> None:
         taken = busy.getsockname()[1]
         assert find_free_port(taken) != taken
     assert find_free_port(taken) == taken  # free again once released
+
+
+async def test_check_again_notices_that_webodm_has_been_started(user: User, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from avispria.adapters.system_probe import EngineStatus
+    from avispria.app import doctor as doctor_module
+    from avispria.core.feasibility import SystemSpec
+
+    spec = SystemSpec("Windows 11", 12, 16.0, 8.0, 4.0, 200.0)
+    state = {"up": False}
+    monkeypatch.setattr(doctor_module, "probe_system", lambda workdir: spec)
+    monkeypatch.setattr(doctor_module, "running_engine_programs", lambda: [])
+    monkeypatch.setattr(
+        doctor_module,
+        "probe_engines",
+        lambda: [EngineStatus("WebODM", "http://localhost:8000/", state["up"], "x")],
+    )
+    await user.open("/")
+    await user.should_see("Not found")
+    await user.should_see("not only installed")
+    state["up"] = True  # the person starts WebODM, waits for its dashboard, and presses the button
+    user.find(marker="check-again").click()
+    await user.should_see("WebODM is running", retries=100)
+    await user.should_not_see("Not found")

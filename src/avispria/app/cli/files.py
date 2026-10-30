@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import uuid
 from pathlib import Path
 from typing import Annotated
 
@@ -70,10 +71,19 @@ def sheet(
 @app.command("prepare-copy")
 def prepare_copy_cmd(
     kmz: Annotated[Path, typer.Argument(exists=True, dir_okay=False)],
-    slot: Annotated[str, typer.Option(help="GUID of the DJI Fly dummy mission to replace")],
     out: Annotated[Path, typer.Option(help="Folder to create the copy layout in")],
+    slot: Annotated[
+        str | None,
+        typer.Option(
+            help="GUID of the DJI Fly placeholder mission to replace. Leave it out to make a "
+            "NEW mission id (an experiment: does DJI Fly list a mission it did not create?)"
+        ),
+    ] = None,
 ) -> None:
-    """Create <GUID>/<GUID>.kmz to copy over a DJI Fly dummy mission (manual install)."""
+    """Create <GUID>/<GUID>.kmz to copy over a DJI Fly placeholder mission (manual install)."""
+    brand_new = slot is None
+    if slot is None:
+        slot = str(uuid.uuid4()).upper()
     try:
         target = prepare_copy(kmz, slot, out)
     except PlanBlockedError as exc:
@@ -84,7 +94,15 @@ def prepare_copy_cmd(
         typer.secho(str(exc), fg=typer.colors.RED)
         raise typer.Exit(1) from exc
     typer.secho(f"Ready: {target}", fg=typer.colors.GREEN)
-    typer.echo(
-        "Copy it over Android/data/dji.go.v5/files/waypoint/"
-        f"{slot}/{slot}.kmz on the phone (keep a backup of the original first)."
-    )
+    if brand_new:
+        typer.echo(
+            "A NEW mission id was made. Copy the whole folder into "
+            "Android/data/dji.go.v5/files/waypoint/ on the phone, close DJI Fly completely "
+            "and open it again. DJI Fly may not list a mission it did not create itself: "
+            "if it does not, delete the folder and use a placeholder mission instead."
+        )
+    else:
+        typer.echo(
+            "Copy it over Android/data/dji.go.v5/files/waypoint/"
+            f"{slot}/{slot}.kmz on the phone (keep a backup of the original first)."
+        )

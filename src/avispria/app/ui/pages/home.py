@@ -61,11 +61,14 @@ async def home_page() -> None:
                         "no-caps"
                     ).mark(f"open-{target.strip('/')}")
         with ui.card().classes("w-full"):
-            ui.label("Your computer").classes("text-lg font-bold")
+            with ui.row().classes("w-full items-center justify-between"):
+                ui.label("Your computer").classes("text-lg font-bold")
+                again = (
+                    ui.button("Check again", icon="refresh")
+                    .props("flat no-caps")
+                    .mark("check-again")
+                )
             box = ui.column().classes("w-full")
-            with box:
-                ui.spinner()
-                ui.label("Checking your computer...")
         with ui.card().classes("w-full av-note-caution"):
             ui.label("Before you fly").classes("font-bold")
             ui.label(
@@ -73,11 +76,24 @@ async def home_page() -> None:
                 "flown yet: try a small test area in open, flat terrain first, keep the drone "
                 "in sight, and follow the rules that apply where you fly."
             ).classes("text-sm")
+
+    async def check() -> None:
+        again.disable()
+        box.clear()
+        with box:
+            ui.spinner()
+            ui.label("Checking your computer...")
+        result = await run_job(run_doctor, Path.home())
+        box.clear()
+        with box:
+            if result.ok and result.value is not None:
+                status_rows(system_rows(result.value))
+            else:
+                ui.label(f"Could not check this computer: {result.error}").classes(
+                    "av-problem-text"
+                )
+        again.enable()
+
+    again.on_click(check)
     await ui.context.client.connected()
-    result = await run_job(run_doctor, Path.home())
-    box.clear()
-    with box:
-        if result.ok and result.value is not None:
-            status_rows(system_rows(result.value))
-        else:
-            ui.label(f"Could not check this computer: {result.error}").classes("av-problem-text")
+    await check()

@@ -119,14 +119,26 @@ def system_rows(report: DoctorReport) -> list[StatusRow]:
     node = next((e for e in report.engines if e.name == "Processing node" and e.reachable), None)
     if running is not None or node is not None:
         rows.append(StatusRow("Map-making engine", "WebODM is running", "good"))
+    elif report.programs:
+        rows.append(
+            StatusRow(
+                "Map-making engine",
+                "WebODM's programs are running, but none is answering",
+                "caution",
+                "If you just started WebODM, wait until its dashboard opens in your browser, "
+                "then press Check again. If it was started as administrator, close it and start "
+                "it normally: Windows hides administrator programs from other programs.",
+            )
+        )
     else:
         rows.append(
             StatusRow(
                 "Map-making engine",
                 "Not found",
                 "caution",
-                "To make maps, install WebODM (free, webodm.org/download) and start it. "
-                "Checking photos and planning flights work without it.",
+                "WebODM must be running, not only installed: open the WebODM app, start it and "
+                "wait until its dashboard opens, then press Check again. To install it (free): "
+                "webodm.org/download. Checking photos and planning flights work without it.",
             )
         )
     return rows

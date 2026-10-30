@@ -304,3 +304,26 @@ def test_find_engine_prefers_the_running_program_and_falls_back_to_the_standard_
     assert system_probe.find_engine() is standard
     monkeypatch.setattr(system_probe, "find_default_node", lambda *a, **k: None)
     assert system_probe.find_engine() is None
+
+
+class FakeProcess:
+    def __init__(self, name: str, exe: str = "") -> None:
+        self.info = {"pid": 1, "name": name, "exe": exe}
+
+
+def test_running_webodm_programs_are_listed_even_when_their_ports_cannot_be_seen(
+    monkeypatch,
+) -> None:  # type: ignore[no-untyped-def]
+    processes = [
+        FakeProcess("WebODM.exe", r"C:\WebODM\WebODM.exe"),
+        FakeProcess("nodeodx.exe", r"C:\WebODM\resources\nodeodx.exe"),
+        FakeProcess("redis-server.exe", r"C:\WebODM\redis\redis-server.exe"),  # not an HTTP service
+        FakeProcess("postgres.exe", r"C:\WebODM\postgres\bin\postgres.exe"),
+        FakeProcess("chrome.exe", r"C:\Program Files\Chrome\chrome.exe"),
+        FakeProcess("python.exe", r"C:\Python312\python.exe"),
+        FakeProcess("System", ""),
+    ]
+    monkeypatch.setattr(system_probe.psutil, "process_iter", lambda attrs=None: iter(processes))
+    assert system_probe.running_engine_programs() == ["WebODM.exe", "nodeodx.exe"]
+    monkeypatch.setattr(system_probe.psutil, "process_iter", lambda attrs=None: iter(processes[4:]))
+    assert system_probe.running_engine_programs() == []  # nothing from WebODM: not running at all

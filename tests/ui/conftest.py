@@ -25,6 +25,7 @@ def fake_computer(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-d
         ]
         monkeypatch.setattr(doctor_module, "probe_system", lambda workdir: spec)
         monkeypatch.setattr(doctor_module, "probe_engines", lambda: engines)
+        monkeypatch.setattr(doctor_module, "running_engine_programs", lambda: [])
 
     return install
 
@@ -83,6 +84,7 @@ def machine(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
         monkeypatch.setattr(doctor_module, "probe_system", lambda workdir: pc)
         engines = [EngineStatus("WebODM", "http://127.0.0.1:29800/", True, "HTTP 200")]
         monkeypatch.setattr(doctor_module, "probe_engines", lambda: engines)
+        monkeypatch.setattr(doctor_module, "running_engine_programs", lambda: [])
 
     return install
 

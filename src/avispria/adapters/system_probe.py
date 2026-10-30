@@ -103,6 +103,23 @@ def discover_local_services() -> list[tuple[str, int, str, int]]:
     return sorted(found, key=lambda item: (item[3], item[1]))
 
 
+def running_engine_programs() -> list[str]:
+    """Names of the running WebODM / NodeODX programs, whether or not their ports can be seen.
+
+    Tells "not running" from "running, but not answering yet" or "running as administrator, so
+    Windows hides its network ports from this program".
+    """
+    names: set[str] = set()
+    for proc in psutil.process_iter(attrs=["pid", "name", "exe"]):
+        info = proc.info
+        label = f"{info.get('name') or ''} {info.get('exe') or ''}".lower()
+        if any(marker in label for marker in ENGINE_MARKERS) and not any(
+            skip in label for skip in NON_HTTP_SERVICES
+        ):
+            names.add(str(info.get("name") or "?"))
+    return sorted(names)
+
+
 DEFAULT_NODE_PORT = 3000  # NodeODX default when no --port is given
 
 

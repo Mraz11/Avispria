@@ -539,3 +539,50 @@ def test_qa_with_a_ground_height_checks_photos_that_record_only_a_sea_level_heig
     assert "above the ground (taken as 463.7 m above sea level)" in result.output
     assert "height 49.4 m" in result.output  # 513.1 - 463.7
     assert "QA016" in result.output  # the camera angle is not recorded, and that is said
+
+
+def _doctor_with(monkeypatch: pytest.MonkeyPatch, programs: list[str]) -> str:
+    from avispria.adapters.system_probe import EngineStatus
+    from avispria.app import doctor as doctor_module
+    from avispria.core.feasibility import SystemSpec
+
+    spec = SystemSpec("Windows 11", 12, 16.0, 2.4, 12.0, 111.0)
+    down = [EngineStatus("WebODM", "http://localhost:8000/", False, "refused")]
+    monkeypatch.setattr(doctor_module, "probe_system", lambda workdir: spec)
+    monkeypatch.setattr(doctor_module, "probe_engines", lambda: down)
+    monkeypatch.setattr(doctor_module, "running_engine_programs", lambda: programs)
+    return runner.invoke(app, ["doctor"]).output
+
+
+def test_doctor_says_when_webodm_is_not_running_at_all(monkeypatch: pytest.MonkeyPatch) -> None:
+    out = _doctor_with(monkeypatch, [])
+    assert (
+        "not found running" in out and "not only installed" in out and "webodm.org/download" in out
+    )
+    assert "administrator" not in out  # nothing of WebODM runs, so that is not the problem
+
+
+def test_doctor_says_when_webodm_runs_but_nothing_answers(monkeypatch: pytest.MonkeyPatch) -> None:
+    out = _doctor_with(monkeypatch, ["WebODM.exe", "nodeodx.exe"])
+    assert "its programs are running (WebODM.exe, nodeodx.exe) but none is answering" in out
+    assert "started as administrator" in out and "dashboard opens" in out
+    assert "not only installed" not in out
+
+
+def test_prepare_copy_can_make_a_brand_new_mission_id(tmp_path: Path) -> None:
+    import re
+
+    result = runner.invoke(app, ["prepare-copy", str(DUMMY), "--out", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    folders = [p for p in tmp_path.iterdir() if p.is_dir()]
+    assert len(folders) == 1
+    guid = folders[0].name
+    assert re.fullmatch(
+        r"[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12}", guid
+    )  # upper-case, like DJI Fly's
+    assert (folders[0] / f"{guid}.kmz").is_file()
+    assert "NEW mission id" in result.output and "did not create" in result.output
+    again = runner.invoke(app, ["prepare-copy", str(DUMMY), "--out", str(tmp_path)])
+    assert (
+        again.exit_code == 0 and len([p for p in tmp_path.iterdir() if p.is_dir()]) == 2
+    )  # a new one each time

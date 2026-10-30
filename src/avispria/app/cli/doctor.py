@@ -38,10 +38,23 @@ def _print_doctor(r: DoctorReport, workdir: Path) -> None:
             f"  Engine     processing node at {node.url} ({node.detail})", fg=typer.colors.GREEN
         )
     else:
-        typer.secho("  WebODM     not found running on this computer", fg=typer.colors.YELLOW)
-        typer.echo("             If it is not installed: https://webodm.org/download (free).")
-        typer.echo("             If it is installed, start it and run `avispria doctor` again,")
-        typer.echo("             or give its address: avispria doctor --webodm-url http://...")
+        pad = " " * 13
+        if r.programs:
+            typer.secho(
+                f"  WebODM     its programs are running ({', '.join(r.programs)}) "
+                "but none is answering",
+                fg=typer.colors.YELLOW,
+            )
+            typer.echo(f"{pad}If you just started it, wait until its dashboard opens.")
+            typer.echo(f"{pad}If it was started as administrator, close it and start it")
+            typer.echo(f"{pad}normally: Windows hides administrator programs from others.")
+        else:
+            typer.secho("  WebODM     not found running on this computer", fg=typer.colors.YELLOW)
+            typer.echo(f"{pad}It must be running, not only installed: open the WebODM")
+            typer.echo(f"{pad}app, start it, wait until its dashboard opens, then run")
+            typer.echo(f"{pad}`avispria doctor` again. To install it (free):")
+            typer.echo(f"{pad}https://webodm.org/download")
+        typer.echo(f"{pad}Or give its address: avispria doctor --webodm-url http://...")
     if r.assessment is None or r.job is None:
         if r.unreadable:
             typer.secho(

@@ -197,3 +197,21 @@ def test_key_outputs_have_plain_labels_and_full_paths(tmp_path: Path) -> None:
     ]
     assert found[0][1] == tmp_path / "results/odm_orthophoto/odm_orthophoto.tif"
     assert json.dumps(PROVENANCE)  # plain data, as written to the provenance file
+
+
+def test_the_engine_row_tells_three_situations_apart() -> None:
+    from avispria.core.feasibility import SystemSpec  # noqa: F401  (doctor() builds the spec)
+
+    nothing = {r.label: r for r in system_rows(doctor(engine=False))}["Map-making engine"]
+    assert (
+        nothing.value == "Not found"
+        and "not only installed" in nothing.hint
+        and "Check again" in nothing.hint
+    )
+    report = doctor(engine=False)
+    report.programs.extend(["WebODM.exe", "nodeodx.exe"])
+    hidden = {r.label: r for r in system_rows(report)}["Map-making engine"]
+    assert hidden.level == "caution" and "running, but none is answering" in hidden.value
+    assert "administrator" in hidden.hint and "wait until its dashboard opens" in hidden.hint
+    up = {r.label: r for r in system_rows(doctor(engine=True))}["Map-making engine"]
+    assert up.level == "good" and up.value == "WebODM is running"

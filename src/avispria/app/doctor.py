@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import statistics
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from avispria.adapters.photos import photo_files, scan_photos
@@ -19,6 +19,7 @@ from avispria.adapters.system_probe import (
     probe_engines,
     probe_system,
     probe_webodm_api,
+    running_engine_programs,
 )
 from avispria.core.feasibility import Assessment, JobSpec, SystemSpec, assess
 
@@ -33,6 +34,7 @@ class DoctorReport:
     job: JobSpec | None
     assessment: Assessment | None
     unreadable: int
+    programs: list[str] = field(default_factory=list)  # WebODM programs running, any port
 
 
 def job_from_folder(folder: Path, *, recursive: bool = False) -> tuple[JobSpec | None, int]:
@@ -57,6 +59,7 @@ def run_doctor(
     webodm_url: str | None = None,
     system_probe: Callable[[Path], SystemSpec] | None = None,
     engine_probe: Callable[[], list[EngineStatus]] | None = None,
+    program_probe: Callable[[], list[str]] | None = None,
 ) -> DoctorReport:
     system = (system_probe or probe_system)(workdir)
     job, unreadable = (None, 0) if folder is None else job_from_folder(folder, recursive=recursive)
@@ -79,7 +82,11 @@ def run_doctor(
             engines = probe_engines()
     except Exception as exc:  # a diagnostic must report problems, never crash on them
         engines = [EngineStatus("WebODM", webodm_url or "", False, f"engine check failed: {exc}")]
-    return DoctorReport(system, engines, docker_available(), job, assessment, unreadable)
+    try:
+        programs = (program_probe or running_engine_programs)()
+    except Exception:  # a diagnostic must report problems, never crash on them
+        programs = []
+    return DoctorReport(system, engines, docker_available(), job, assessment, unreadable, programs)
 
 
 @dataclass(frozen=True)

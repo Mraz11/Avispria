@@ -220,3 +220,72 @@ def suggest_role(new: DrawnShape, existing: Sequence[DrawnShape]) -> Role:
         return Role.LEAVE_OUT if inside.contains(_geometry(frame, new)) else Role.INSIDE
     except ShapeError:
         return Role.INSIDE
+
+
+# ---------------------------------------------------------------------------------- editing a shape
+MIN_CORNERS = {"polygon": 3, "rectangle": 3, "line": 2}
+
+
+def corner_points(shape: DrawnShape) -> tuple[tuple[float, float], ...]:
+    """The points a person can move: an area's corners, a line's vertices, a circle's centre."""
+    return shape.points
+
+
+def move_corner(shape: DrawnShape, index: int, lon: float, lat: float) -> DrawnShape:
+    """Move one corner (or a circle's centre). A rectangle whose corner moves becomes a polygon."""
+    if not 0 <= index < len(shape.points):
+        raise ShapeError(f"{shape.label} has no corner {index + 1}")
+    points = list(shape.points)
+    points[index] = (lon, lat)
+    kind = "polygon" if shape.kind == "rectangle" else shape.kind
+    moved = DrawnShape(shape.id, kind, tuple(points), shape.radius_m, shape.role, shape.width_m)
+    _check(moved)
+    _geometry(_frame([moved]), moved)  # refuses an outline that crosses itself, right now
+    return moved
+
+
+def insert_corner(shape: DrawnShape) -> tuple[DrawnShape, int]:
+    """A new corner in the middle of the longest side: the shape and the new corner's index."""
+    if shape.kind == "circle":
+        raise ShapeError("A circle has no corners to add; change its radius instead.")
+    frame = _frame([shape])
+    local = _local_points(frame, shape)
+    closed = shape.kind != "line"
+    count = len(local)
+    edges = [(i, (i + 1) % count) for i in range(count if closed else count - 1)]
+    start, end = max(
+        edges,
+        key=lambda e: math.hypot(local[e[1]][0] - local[e[0]][0], local[e[1]][1] - local[e[0]][1]),
+    )
+    mid_x = (local[start][0] + local[end][0]) / 2.0
+    mid_y = (local[start][1] + local[end][1]) / 2.0
+    lons, lats = frame.to_lonlat([mid_x], [mid_y])
+    points = list(shape.points)
+    points.insert(start + 1, (float(lons[0]), float(lats[0])))
+    kind = "polygon" if shape.kind == "rectangle" else shape.kind
+    grown = DrawnShape(shape.id, kind, tuple(points), shape.radius_m, shape.role, shape.width_m)
+    return grown, start + 1
+
+
+def delete_corner(shape: DrawnShape, index: int) -> DrawnShape:
+    """Take one corner away; an area keeps at least three, a line two."""
+    if shape.kind == "circle":
+        raise ShapeError("A circle has no corners to remove.")
+    if not 0 <= index < len(shape.points):
+        raise ShapeError(f"{shape.label} has no corner {index + 1}")
+    if len(shape.points) <= MIN_CORNERS[shape.kind]:
+        word = "line" if shape.kind == "line" else "area"
+        raise ShapeError(f"A {word} needs at least {MIN_CORNERS[shape.kind]} corners.")
+    points = shape.points[:index] + shape.points[index + 1 :]
+    kind = "polygon" if shape.kind == "rectangle" else shape.kind
+    smaller = DrawnShape(shape.id, kind, points, shape.radius_m, shape.role, shape.width_m)
+    _geometry(_frame([smaller]), smaller)
+    return smaller
+
+
+def with_radius(shape: DrawnShape, radius_m: float) -> DrawnShape:
+    if shape.kind != "circle":
+        raise ShapeError("Only a circle has a radius.")
+    changed = DrawnShape(shape.id, shape.kind, shape.points, radius_m, shape.role, shape.width_m)
+    _geometry(_frame([changed]), changed)  # refuses a radius that is not a positive number
+    return changed

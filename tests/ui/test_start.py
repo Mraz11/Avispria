@@ -93,3 +93,9 @@ async def test_check_again_notices_that_webodm_has_been_started(user: User, monk
     user.find(marker="check-again").click()
     await user.should_see("WebODM is running", retries=100)
     await user.should_not_see("Not found")
+
+
+async def test_the_privacy_promise_is_exact_about_what_can_contact_the_internet(user: User) -> None:
+    await user.open("/")
+    await user.should_see("Nothing is sent anywhere unless you ask")
+    await user.should_see("only when you use them")

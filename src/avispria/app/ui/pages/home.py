@@ -48,7 +48,8 @@ async def home_page() -> None:
                 ui.label(TAGLINE).classes("av-muted")
                 ui.label(
                     "Plan drone flights, check your photos and turn them into maps, all on your "
-                    "own computer. Nothing is sent anywhere."
+                    "own computer. Nothing is sent anywhere unless you ask: the map background "
+                    "and the place search in the map contact OpenStreetMap, only when you use them."
                 )
         with ui.row().classes("w-full gap-4"):
             for title, text, target, icon in TASKS:

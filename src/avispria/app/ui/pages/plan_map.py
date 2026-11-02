@@ -21,8 +21,18 @@ from typing import Any
 from nicegui import events, ui
 from shapely.geometry import mapping
 
-from avispria.app.ui.inputs import parse_latlon_text
 from avispria.app.ui.map_events import event_layer, parse_layer
+from avispria.app.ui.pages.plan_map_edit import EDIT_CSS, EditingMixin
+from avispria.app.ui.pages.plan_map_places import PlacesMixin
+from avispria.app.ui.pages.plan_map_text import (
+    BACKGROUND_NOTE,
+    HELP,
+    KIND_ICONS,
+    LEAVE_OUT_NOTE,
+    PRIVACY_NOTE,
+    ROLE_COLOURS,
+    ROLE_LABELS,
+)
 from avispria.core.shapes import (
     ALLOWED_ROLES,
     DEFAULT_WIDTH_M,
@@ -39,45 +49,13 @@ OSM_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 OSM_ATTRIBUTION = (
     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 )
-ROLE_LABELS = {
-    Role.INSIDE: "Map inside it",
-    Role.LEAVE_OUT: "Leave it out",
-    Role.BAND: "Map a band around it (outside)",
-    Role.CORRIDOR: "Map a strip along it",
-}
-ROLE_COLOURS = {
-    Role.INSIDE: "#2D9A5B",
-    Role.LEAVE_OUT: "#D1495B",
-    Role.BAND: "#E08E2B",
-    Role.CORRIDOR: "#2F7FD1",
-}
-KIND_ICONS = {
-    "polygon": "polyline",
-    "rectangle": "crop_square",
-    "circle": "radio_button_unchecked",
-    "line": "timeline",
-}
-HELP = (
-    "Use the tools at the top left of the map: polygon, rectangle, circle, line, or the pin for "
-    "the takeoff point. Each shape you draw appears in the list below with what it does. The "
-    "area that will be planned is drawn in green."
-)
-BACKGROUND_NOTE = (
-    "The background is OpenStreetMap, loaded from the internet only while this switch is on "
-    "(their terms: openstreetmap.org/copyright). The map works without it: you then see only your "
-    "shapes."
-)
-LEAVE_OUT_NOTE = (
-    "Parts you leave out are not planned for coverage, but the aircraft may still fly over them to "
-    "turn or to reach the next line. Do not rely on this for anything that must not be overflown."
-)
 
 
 def _latlngs(points: tuple[tuple[float, float], ...]) -> list[list[float]]:
     return [[lat, lon] for lon, lat in points]
 
 
-class AreaMap:
+class AreaMap(EditingMixin, PlacesMixin):
     """The drawing map and its list of shapes; the result is ``geojson`` and ``takeoff_text``."""
 
     def __init__(self, on_takeoff: Callable[[str], None]) -> None:
@@ -92,25 +70,44 @@ class AreaMap:
         self._result_layers: list[Any] = []
         self._takeoff_layer: Any = None
         self._tile_layer: Any = None
+        self._here_layers: list[Any] = []
+        self._init_editing()
         self._build()
 
     # ------------------------------------------------------------------ building
     def _build(self) -> None:
+        ui.add_css(
+            EDIT_CSS
+        )  # hides Leaflet's own edit tool, which cannot work here; styles corner labels
         ui.label(HELP).classes("text-sm av-muted")
         with ui.row().classes("w-full items-center gap-3"):
             self.background = ui.switch(
                 "Show map background (uses the internet)", on_change=lambda _: self._background()
             ).mark("map-background")
+        with ui.row().classes("w-full items-center gap-3"):
             self.goto = (
-                ui.input("Go to: latitude, longitude")
+                ui.input("Find a place, or type latitude, longitude")
                 .props("outlined dense")
-                .classes("w-64")
+                .classes("w-96")
                 .mark("map-goto-input")
             )
-            ui.button("Go", on_click=lambda: self.go_to(self.goto.value or "")).props(
+            self.goto.on("keydown.enter", self.find)
+            ui.button("Search", icon="search", on_click=self.find).props("no-caps outline").mark(
+                "map-goto"
+            )
+            ui.button("My location", icon="my_location", on_click=self.my_location).props(
                 "no-caps outline"
-            ).mark("map-goto")
-        with ui.expansion("Use a different map background", icon="layers").classes("w-full"):
+            ).mark("map-location")
+        self.places_box = ui.column().classes("w-full gap-1")
+        with ui.expansion("Map background and place search settings", icon="layers").classes(
+            "w-full"
+        ):
+            self.search_service = (
+                ui.input("Place search service address (empty = OpenStreetMap's)")
+                .props("outlined dense")
+                .classes("w-full")
+                .mark("map-search-service")
+            )
             self.tile_url = (
                 ui.input("Tile address, like https://example.com/{z}/{x}/{y}.png")
                 .props("outlined dense")
@@ -118,6 +115,7 @@ class AreaMap:
                 .mark("map-tile-url")
             )
             ui.label(BACKGROUND_NOTE).classes("text-sm av-muted")
+            ui.label(PRIVACY_NOTE).classes("text-sm av-muted")
         self.map = (
             ui.leaflet(
                 center=(20.0, 0.0),
@@ -141,11 +139,18 @@ class AreaMap:
         # the widget adds an OpenStreetMap layer by itself: nothing may reach the internet unasked
         self.map.layers.clear()
         self.map.on("draw:created", self._created)
+        self.map.on("draw:drawstart", self._stop_when_drawing)
+        self.map.on("map-click", self._map_click)
         self.summary = ui.label().classes("font-medium").mark("map-summary")
         self.notes = ui.column().classes("w-full gap-1")
         self.chooser_box = ui.row().classes("w-full items-center gap-3")
         self.list = ui.column().classes("w-full gap-2")
         with ui.row().classes("gap-3"):
+            self.undo_button = (
+                ui.button("Undo", icon="undo", on_click=self.undo)
+                .props("no-caps outline")
+                .mark("map-undo")
+            )
             ui.button("Remove all shapes", icon="delete_sweep", on_click=self.clear).props(
                 "no-caps flat"
             ).mark("map-clear")
@@ -162,6 +167,7 @@ class AreaMap:
     def add_drawn(self, layer_type: str, layer: Any) -> None:
         """A shape was drawn (or, in tests, handed over): keep it and show what it does."""
         drawn = parse_layer(layer_type, layer)
+        self._remember()
         if drawn.kind == "marker":
             self.takeoff = drawn.points[0]
             lon, lat = self.takeoff
@@ -173,17 +179,11 @@ class AreaMap:
             self.shapes.append(shape)
         self._refresh()
 
-    def go_to(self, text: str) -> None:
-        try:
-            lat, lon = parse_latlon_text(text)
-        except ValueError as exc:
-            ui.notify(str(exc), type="warning")
-            return
-        self.map.set_center((lat, lon))
-        self.map.set_zoom(16)
-
     def clear(self) -> None:
-        self.shapes.clear()
+        if self.shapes or self.takeoff is not None:
+            self._remember()
+        self.shapes = []
+        self.editing = self.selected = None
         if self.takeoff is not None:
             self.takeoff = None
             self._on_takeoff("")  # the pin goes, and so must the coordinates it put in the form
@@ -214,6 +214,7 @@ class AreaMap:
         self._redraw_map()
         self._render_text()
         self._render_list()
+        self._sync_undo_button()
 
     def _redraw_map(self) -> None:
         for layer in [*self._shape_layers, *self._result_layers]:
@@ -259,6 +260,7 @@ class AreaMap:
             self._takeoff_layer = None
         if self.takeoff is not None:
             self._takeoff_layer = self.map.marker(latlng=(self.takeoff[1], self.takeoff[0]))
+        self._draw_corners()
 
     def _render_text(self) -> None:
         if self.result is None:
@@ -303,6 +305,8 @@ class AreaMap:
         with self.list:
             for shape in self.shapes:
                 self._row(shape)
+                if shape.id == self.editing:
+                    self._edit_controls(shape)
             if self.takeoff is not None:
                 lon, lat = self.takeoff
                 with ui.row().classes("w-full items-center gap-3"):
@@ -335,12 +339,16 @@ class AreaMap:
             ui.label(_area_text(value) if unit == "m2" else f"{value:,.0f} m long").classes(
                 "text-sm av-muted"
             )
+            ui.button(icon="edit", on_click=lambda _, i=shape.id: self.start_edit(i)).props(
+                "flat round"
+            ).tooltip("Move its corners").mark(f"shape-edit-{shape.id}")
             ui.button(icon="delete", on_click=lambda i=shape.id: self.delete(i)).props(
                 "flat round"
             ).mark(f"shape-delete-{shape.id}")
 
     # ------------------------------------------------------------------ editing
     def _replace(self, shape_id: int, **changes: Any) -> None:
+        self._remember((shape_id, *sorted(changes)))
         self.shapes = [replace(s, **changes) if s.id == shape_id else s for s in self.shapes]
         self._refresh()
 
@@ -352,10 +360,14 @@ class AreaMap:
             self._replace(shape_id, width_m=float(width))
 
     def delete(self, shape_id: int) -> None:
+        self._remember()
         self.shapes = [s for s in self.shapes if s.id != shape_id]
+        if self.editing == shape_id:
+            self.editing = self.selected = None
         self._refresh()
 
     def _remove_takeoff(self) -> None:
+        self._remember()
         self.takeoff = None
         self._on_takeoff("")
         self._refresh()

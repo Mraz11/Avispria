@@ -12,6 +12,7 @@ from typing import Any, Literal
 
 from avispria.adapters.adb import AdbError
 from avispria.adapters.engine import EngineError
+from avispria.adapters.geocode import GeocodeError
 from avispria.app.phone_workflow import SendError
 from avispria.app.process_workflow import ProcessBlockedError
 from avispria.app.workflow import PlanBlockedError
@@ -29,6 +30,7 @@ KNOWN = (
     ProcessBlockedError,
     AdbError,
     SendError,
+    GeocodeError,
     ValueError,
 )
 

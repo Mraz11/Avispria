@@ -204,3 +204,105 @@ def test_the_size_shown_beside_a_shape() -> None:
     value, unit = shape_size(line(2, 250.0))
     assert unit == "m" and value == pytest.approx(250, rel=0.01)
     assert DEFAULT_WIDTH_M == 30.0
+
+
+# ------------------------------------------------------------------------------ editing a shape
+from avispria.core.shapes import (  # noqa: E402
+    corner_points,
+    delete_corner,
+    insert_corner,
+    move_corner,
+    with_radius,
+)
+
+
+def test_moving_a_corner_changes_only_that_corner_and_the_area() -> None:
+    square = rect(1, 100, 100)
+    corner = square.points[2]
+    moved = move_corner(square, 2, corner[0] + 0.0005, corner[1])  # about 35 m east
+    assert [p for i, p in enumerate(moved.points) if i != 2] == [
+        p for i, p in enumerate(square.points) if i != 2
+    ]
+    assert moved.points[2][0] == pytest.approx(corner[0] + 0.0005)
+    assert total(build_area([moved])) > total(build_area([square]))
+    assert (moved.id, moved.role, moved.width_m) == (square.id, square.role, square.width_m)
+
+
+def test_a_rectangle_whose_corner_moves_becomes_a_polygon_so_its_roles_still_apply() -> None:
+    moved = move_corner(rect(1, 100, 100, role=Role.LEAVE_OUT), 0, LON - 0.001, LAT - 0.001)
+    assert moved.kind == "polygon" and moved.role == Role.LEAVE_OUT and len(moved.points) == 4
+
+
+def test_a_circle_moves_by_its_centre_and_keeps_its_radius() -> None:
+    moved = move_corner(circle(1, 40), 0, LON + 0.001, LAT)
+    assert moved.kind == "circle" and moved.radius_m == 40 and moved.points == ((LON + 0.001, LAT),)
+    assert corner_points(moved) == moved.points
+
+
+def test_a_corner_dragged_to_make_the_outline_cross_itself_is_refused() -> None:
+    p0, p1, p2, _ = rect(1, 100, 100).points
+    # past the side p1-p2, level with its middle: the side p3-p0 now cuts across it (a bow tie)
+    far = (
+        p1[0] + (p1[0] - p0[0]) + (p2[0] - p1[0]) / 2,
+        p1[1] + (p1[1] - p0[1]) + (p2[1] - p1[1]) / 2,
+    )
+    with pytest.raises(ShapeError, match="crosses itself"):
+        move_corner(rect(1, 100, 100), 0, far[0], far[1])
+
+
+def test_there_is_no_corner_that_is_not_there() -> None:
+    with pytest.raises(ShapeError, match="no corner 9"):
+        move_corner(rect(1, 100, 100), 8, LON, LAT)
+    with pytest.raises(ShapeError, match="no corner 9"):
+        delete_corner(rect(1, 100, 100), 8)
+
+
+def test_a_new_corner_goes_in_the_middle_of_the_longest_side_and_changes_nothing_else() -> None:
+    wide = rect(1, 200, 50)  # the long sides run east to west
+    grown, index = insert_corner(wide)
+    assert len(grown.points) == 5 and grown.kind == "polygon" and index in (1, 2, 3, 4)
+    assert total(build_area([grown])) == pytest.approx(
+        total(build_area([wide])), rel=0.001
+    )  # same outline
+    new_lon, new_lat = grown.points[index]
+    before, after = grown.points[index - 1], grown.points[(index + 1) % 5]
+    assert new_lon == pytest.approx((before[0] + after[0]) / 2, abs=1e-7)
+    assert new_lat == pytest.approx((before[1] + after[1]) / 2, abs=1e-7)
+
+
+def test_a_new_vertex_on_a_line_goes_on_its_longest_leg() -> None:
+    bent = DrawnShape(
+        1, "line", ((LON, LAT), (LON + 0.0002, LAT), (LON + 0.0010, LAT)), role=Role.CORRIDOR
+    )
+    grown, index = insert_corner(bent)
+    assert (
+        index == 2
+        and len(grown.points) == 4
+        and grown.points[2][0] == pytest.approx(LON + 0.0006, abs=1e-6)
+    )
+
+
+def test_a_circle_has_no_corner_to_add_or_remove() -> None:
+    with pytest.raises(ShapeError, match="no corners to add"):
+        insert_corner(circle(1, 40))
+    with pytest.raises(ShapeError, match="no corners to remove"):
+        delete_corner(circle(1, 40), 0)
+
+
+def test_an_area_keeps_three_corners_and_a_line_two() -> None:
+    four = rect(1, 100, 100)
+    three = delete_corner(four, 1)
+    assert len(three.points) == 3 and three.kind == "polygon"
+    with pytest.raises(ShapeError, match="at least 3 corners"):
+        delete_corner(three, 0)
+    with pytest.raises(ShapeError, match="at least 2 corners"):
+        delete_corner(line(2, 100.0), 0)
+
+
+def test_a_circles_radius_can_change_but_not_to_nothing() -> None:
+    assert with_radius(circle(1, 40), 55).radius_m == 55
+    for bad in (0.0, -5.0, float("nan")):
+        with pytest.raises(ShapeError, match="needs a centre and a radius"):
+            with_radius(circle(1, 40), bad)
+    with pytest.raises(ShapeError, match="Only a circle"):
+        with_radius(rect(1, 10, 10), 5)

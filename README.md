@@ -5,7 +5,8 @@
 **Canopy structure and change, seen from above.**
 
 Avispria is a free, open-source toolkit for researchers who map with consumer **RGB drones** (no
-special sensor needed). It runs on your own computer, works without internet once installed, and has
+special sensor needed). It runs on your own computer, works without internet once installed (only the optional map
+background and place search use it, and only when you switch them on), and has
 four parts:
 
 - **Plan a flight**: describe the area you want to map and get DJI Fly missions, with a prediction of
@@ -148,7 +149,7 @@ Start it as described above. It has four screens and a light/dark switch in the 
 |---|---|
 | **Start** | Shows what your computer can do and whether WebODM is running. |
 | **Check my photos** | A verdict, the key numbers, a map of where each photo was taken, and every warning explained in plain words ("what it means" and "what to do"). Optionally uses an elevation model so results are right over hills. |
-| **Plan a flight** | Describe the area (by numbers, a map file, or by **drawing it on a map**: polygon, rectangle, circle or line, with parts left out and bands around shapes), your drone and what you need; get DJI Fly mission files, the route on a map, and the prediction of what you will really get. |
+| **Plan a flight** | Describe the area (by numbers, a map file, or by **drawing it on a map**: polygon, rectangle, circle or line, with parts left out and bands around shapes; find the place by name or use your location, see [the map guide](docs/map.md)), your drone and what you need; get DJI Fly mission files, the route on a map, and the prediction of what you will really get. |
 | **Make maps** | Pick the photos and a quality level; Avispria checks that your computer can handle the job, follows the progress (you can cancel), and gives you the orthophoto, surface model and point cloud. |
 | **Phone** | Sends a plan straight into DJI Fly on your Android phone (USB cable or Wi-Fi), with the original kept, and copies a mission from the phone to use as your sample. See [the phone guide](docs/field/phone-bridge.md). |
 

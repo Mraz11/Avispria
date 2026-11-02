@@ -114,6 +114,31 @@
   waypoint 1); DJI Fly groups actions by KIND (group 1 = arrival actions incl. several in one group, 2 = evenly
   turning tilt, 4 = zoom). The writer now writes that structure, supports Waypoint.heading_deg and hover_s, and its
   default takePhoto has useGlobalPayloadLensIndex (it was missing). Zoom is read but not written.
+  MAP SEARCH + LOCATION (2026-11-02, patch 0033; founder confirmed the map itself works in his browser: map,
+  toolbar, OSM credit): adapters/geocode.py (Nominatim-compatible; at most 1 request/s for the whole application
+  via a lock and 1.1 s pace, answers cached 1 h, User-Agent 'Avispria/<ver> (+repo)', search only on a button
+  press (policy forbids search-as-you-type), OSM credit shown unless another service is configured, error text for
+  403/429/offline/bad JSON); the service address is a setting because the public service's policy counts ALL users of
+  an application together. 'My location' = navigator.geolocation through ui.run_javascript (secure context needed:
+  http://127.0.0.1 or localhost); AreaMap._browser_location is the only JS call so tests replace it (awaiting JS under
+  the simulated user hangs). UNVERIFIED: live Nominatim answers (the sandbox cannot reach it), real browser location.
+  EDITING + UNDO (same patch; founder asked: 'no option to edit after drawing; the edit icon in the toolbar does not
+  work'): Leaflet.draw's own edit tool cannot work because hide_drawn_items=True keeps its feature group empty (and
+  NiceGUI strips an `edit: False` option), so it is hidden with CSS (EDIT_CSS, :has() selector). NiceGUI forwards only
+  MAP-level events (map-click with latlng, draw:*), NOT marker drag/dragend, so editing is by CLICKING: Edit button in a
+  shape's row -> numbered circleMarker discs on its corners -> pick a corner -> click the map to move it (documented
+  pattern: m.on('map-click', ...) with e.args['latlng']). Add corner = midpoint of the longest side; remove picked
+  corner (area >= 3, line >= 2); circle = centre by click + typed radius; a rectangle becomes a polygon when a corner
+  moves; a move that makes the outline cross itself is refused (core/shapes.move_corner validates). Undo (history of 50,
+  consecutive changes to one field = one step, restores shapes AND the takeoff pin/box). Pure operations are in
+  core/shapes.py (move_corner, insert_corner, delete_corner, with_radius). The Start page promise is now exact: nothing
+  is sent unless the map background or place search is used.
+  FILE LAYOUT (the gate has a HARD 400-line limit per file; plan_map.py hit 591 and was split): pages/plan_map.py
+  (AreaMap: build, shapes list, result; 399 lines: NO headroom, split further before adding to it), plan_map_edit.py
+  (EditingMixin: undo + corner editing), plan_map_places.py (PlacesMixin: search, coordinates, location),
+  plan_map_text.py (labels, colours, help texts). Tests patch plan_map_places.search_places and read LOCATION_JS there.
+  UNVERIFIED in a real browser: the numbered tooltips (bindTooltip on circleMarker), the corner discs, clicks while a
+  draw tool is active (draw:drawstart ends editing), live Nominatim answers, real browser location.
   OBJECT SCAN (built 2026-11-02, patch 0032; no flight yet): `avispria scan` (core/scan.py, app/scan_workflow.py,
   docs/field/object-scan.md). Object = upright cylinder; rings at radius+standoff; ring HEIGHTS follow from the heights on
   the surface each ring must be centred on (even, overlapping, base..top) and the tilt schedule (+10 up at the bottom,

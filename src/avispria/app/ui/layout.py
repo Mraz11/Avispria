@@ -23,6 +23,7 @@ NAV = (
     ("Check my photos", "/check"),
     ("Plan a flight", "/plan"),
     ("Make maps", "/process"),
+    ("Phone", "/phone"),
 )
 
 

@@ -150,6 +150,7 @@ Start it as described above. It has four screens and a light/dark switch in the 
 | **Check my photos** | A verdict, the key numbers, a map of where each photo was taken, and every warning explained in plain words ("what it means" and "what to do"). Optionally uses an elevation model so results are right over hills. |
 | **Plan a flight** | Describe the area (by numbers or a map file), your drone and what you need; get DJI Fly mission files, the route on a map, and the prediction of what you will really get. |
 | **Make maps** | Pick the photos and a quality level; Avispria checks that your computer can handle the job, follows the progress (you can cancel), and gives you the orthophoto, surface model and point cloud. |
+| **Phone** | Sends a plan straight into DJI Fly on your Android phone (USB cable or Wi-Fi), with the original kept, and copies a mission from the phone to use as your sample. See [the phone guide](docs/field/phone-bridge.md). |
 
 Everything stays on your computer. The interface listens on `127.0.0.1` only, so nothing is sent
 anywhere and nothing is reachable from the network.
@@ -181,6 +182,7 @@ The same features are available as commands. `uv run avispria --help` lists them
 | `ui` | Open the window interface. |
 | `drones` | List the known aircraft and camera modes. |
 | `camera-from-photo` | Print a camera profile derived from one original photo. |
+| `phone` | Talk to DJI Fly on an Android phone from the computer: `status`, `slots`, `send`, `pull`, `pair`, `connect`. |
 | `inspect`, `lint`, `sheet`, `prepare-copy` | Look inside, check, summarise and install a DJI Fly mission file. |
 
 Examples (on Windows write paths with backslashes):

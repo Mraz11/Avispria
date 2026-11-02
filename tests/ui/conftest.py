@@ -105,3 +105,39 @@ def autel_folder(tmp_path):  # type: ignore[no-untyped-def]
             altitude_asl=513.1,
         )
     return folder
+
+
+@pytest.fixture
+def fake_phone(tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
+    """A phone with two DJI Fly missions (one with a map picture), reached through a fake adb."""
+    import sys
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    from avispria.adapters.adb import Adb
+    from avispria.app import phone_workflow
+    from avispria.app.phone_workflow import WAYPOINT_DIR
+    from avispria.app.ui import phone_job
+    from avispria.app.ui.pages import phone as phone_page
+
+    tests = Path(__file__).resolve().parents[1]
+    sample = tests / "fixtures" / "dji_fly_dummy" / "lito_x1_5wp.kmz"
+    ids = ("59B88CA7-CDF1-4396-8DAE-180AC23D1645", "F6C1AB6D-E118-4CA5-87DE-F90EF97069E6")
+    root = tmp_path / "phone"
+    base = root / WAYPOINT_DIR.lstrip("/")
+    for guid in ids:
+        (base / guid).mkdir(parents=True)
+        (base / guid / f"{guid}.kmz").write_bytes(sample.read_bytes())
+    (base / "map_preview" / ids[0]).mkdir(parents=True)
+    (base / "map_preview" / ids[0] / f"{ids[0]}.jpg").write_bytes(b"\xff\xd8 a small map picture")
+    fake = tests / "fakes" / "fake_adb.py"
+    monkeypatch.setenv("FAKE_ADB_ROOT", str(root))
+    monkeypatch.setattr(
+        Adb, "find", classmethod(lambda cls, explicit=None: Adb([sys.executable, str(fake)]))
+    )
+    for module in (phone_workflow, phone_job, phone_page):
+        monkeypatch.setattr(
+            module, "default_backup_dir", lambda: tmp_path / "backups", raising=False
+        )
+    monkeypatch.setattr(phone_job, "default_sample_dir", lambda: tmp_path / "samples")
+    return SimpleNamespace(root=root, ids=ids, sample=sample, backups=tmp_path / "backups")

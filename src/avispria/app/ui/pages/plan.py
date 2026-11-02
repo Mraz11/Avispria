@@ -45,6 +45,8 @@ async def plan_page() -> None:
                 )
             return
         STATE.last_output = form.out_dir
+        if outcome.value.outputs is not None:
+            STATE.last_plan_files = [str(p) for p in outcome.value.outputs.kmz_paths]
         show_plan(results, outcome.value, Path(form.out_dir).expanduser())
 
     button.on_click(run)

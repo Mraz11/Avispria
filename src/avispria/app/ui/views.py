@@ -13,7 +13,9 @@ from dataclasses import dataclass
 from typing import Literal
 
 from avispria.app.doctor import DoctorReport
+from avispria.app.phone_workflow import Slot
 from avispria.app.ui.explain import explain
+from avispria.app.ui.phone_job import PhoneStatus
 from avispria.core.capture import CaptureReport
 from avispria.core.feasibility import Assessment, gb, ram_needed_gb
 from avispria.core.safety import Issue
@@ -239,3 +241,36 @@ def qa_tiles(report: CaptureReport) -> list[Tile]:
             Tile("Photo interval", f"{s['interval_s_median']:.1f} s", "typical time between photos")
         )
     return tiles
+
+
+def phone_rows(status: PhoneStatus) -> list[StatusRow]:
+    """What the Phone screen says about the connection, one row per thing that can be wrong."""
+    if status.adb_missing:
+        return [StatusRow("Debugging tool (adb)", "Not found", "caution", status.problem or "")]
+    rows = [StatusRow("Debugging tool (adb)", "Found", "good", status.adb or "")]
+    if status.serial is None:
+        waiting = any(d.state == "unauthorized" for d in status.devices)
+        rows.append(
+            StatusRow(
+                "Phone",
+                "Waiting for you to allow this computer" if waiting else "Not connected",
+                "caution",
+                status.problem or "",
+            )
+        )
+        return rows
+    how = "Wi-Fi" if ":" in status.serial else "USB"
+    rows.append(StatusRow("Phone", f"{status.model or status.serial} is connected ({how})", "good"))
+    if status.slots:
+        word = "mission" if len(status.slots) == 1 else "missions"
+        rows.append(StatusRow("DJI Fly", f"{len(status.slots)} {word} found", "good"))
+    else:
+        rows.append(StatusRow("DJI Fly", "No missions yet", "caution", status.problem or ""))
+    return rows
+
+
+def slot_label(slot: Slot) -> str:
+    """One line describing a slot, to choose it by."""
+    made = f"made {slot.created:%d %b %Y}" if slot.created else "no date"
+    sent = f", last sent: {slot.last_sent}" if slot.last_sent else ""
+    return f"{slot.short}... ({slot.waypoints} waypoints, {made}{sent})"

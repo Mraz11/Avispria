@@ -72,18 +72,22 @@
   worked out (elevation model, or `qa --ground-elev M` / the Check screen field); QA015 (no height above
   ground) and QA016 (camera angle not recorded, assumed nadir) added. Finding for later: `process` does not
   upload ODM's gcp_list.txt (GCP support missing); camera-from-photo labels 19.96 MP as "19mp".
-- ROADMAP decided with the founder (2026-10-30), NOT built yet: (1) a drawable MAP in Plan a flight
-  (ui.leaflet has draw_control; background tiles need the internet, so optional + privacy note; ask which
-  basemaps: street / terrain / satellite, check provider terms); (2) a USB/ADB bridge from the PC app to
-  DJI Fly on the phone. RESEARCH: DJI Fly has NO import/export of waypoint files; the only way is to overwrite
-  a placeholder mission's <GUID>/<GUID>.kmz in Android/data/dji.go.v5/files/waypoint/ (iOS: DJI
-  Fly/wayline_mission, with a wpmz.sqlite3 index); folders DJI Fly did not create are reported NOT to be
-  listed (the index location on Android is unknown). Since Android 13 no phone app (incl. file managers, SAF)
-  can touch another app's Android/data; PC over USB (MTP/ADB) can. So the phone cannot do the transfer
-  itself; the PC bridge (pull the missions DJI Fly made = sample mission; push a plan into a chosen
-  placeholder with a backup) is the route, once the founder's phone passes the test `adb shell ls
-  /sdcard/Android/data/dji.go.v5/files/waypoint` (HyperOS may restrict it; unverified). Experiment for the
-  founder: `avispria prepare-copy mission.kmz --out DIR` (no --slot = a NEW id) and see whether DJI Fly lists it.
+- PHONE BRIDGE (built, docs/field/phone-bridge.md): `avispria phone status|slots|pull|send|pair|connect` and the
+  Phone screen. RESEARCH behind it: DJI Fly has NO import/export of waypoint files; a mission folder DJI Fly did not
+  create is NOT listed even with image/ShotSnap.json and map_preview/<ID>/ added (founder tested, 2026-10-30), so
+  the only route is to OVERWRITE a placeholder ("slot") mission's <ID>/<ID>.kmz in
+  Android/data/dji.go.v5/files/waypoint/ (the founder's method). Since Android 13 no phone app can touch that
+  folder, so the PC does it over adb (USB or Wireless debugging): no Avispria phone app. Safety design in
+  app/phone_workflow.py: lint first, back up the original to ~/Avispria/phone-backups, push to <ID>.kmz.avispria-new,
+  verify sha256 on the phone, mv into place, verify again, restore on failure; ids/paths/serials validated because
+  adb shell hands arguments to the phone's shell. adb is NOT bundled (user downloads platform-tools; found on PATH,
+  ~/Avispria/platform-tools, ANDROID_HOME, or chosen on the screen). A real DJI Fly mission folder holds the .kmz +
+  image/ShotSnap.json ({"POI_POINT":{},"WAY_POINT":{}}) + map_preview/<ID>/<ID>.jpg (480x360 Google map picture:
+  never redistribute) and a capability/ folder (same as our fixture). VERIFIED on the founder's Redmi over USB:
+  adb devices, ls of the waypoint folder, push + rm of a file there. NOT verified on a real phone: the full send,
+  Wi-Fi pairing, DJI Fly opening a sent mission. Tested only against tests/fakes/fake_adb.py.
+  STILL TO BUILD: the drawable map in Plan a flight (ui.leaflet draw_control; tiles need the internet, so optional;
+  ask which basemaps); GCP upload; canopy height model.
 - Engine detection: doctor/Start screen now tell apart not running / WebODM programs running but not
   answering (starting, or started as administrator so Windows hides their ports) / running; Check again
   button on Start. The founder's Windows PC reported 'No WebODM-related programs are listening'.

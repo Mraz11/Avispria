@@ -11,6 +11,7 @@ from nicegui import app, ui
 from avispria.app.ui.layout import ASSETS
 from avispria.app.ui.pages.check import check_page
 from avispria.app.ui.pages.home import home_page
+from avispria.app.ui.pages.phone import phone_page
 from avispria.app.ui.pages.plan import plan_page
 from avispria.app.ui.pages.process import process_page
 
@@ -24,6 +25,7 @@ def register_pages() -> None:
     ui.page("/check")(check_page)
     ui.page("/plan")(plan_page)
     ui.page("/process")(process_page)
+    ui.page("/phone")(phone_page)
 
 
 def find_free_port(start: int, tries: int = 20) -> int:

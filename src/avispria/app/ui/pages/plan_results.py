@@ -17,7 +17,8 @@ from avispria.app.ui.widgets import echart, issue_cards, tile_row, verdict_banne
 
 FLY_FILE_HELP = (
     "On your phone, open DJI Fly, choose Waypoint Flight, add two points and save the mission "
-    "(do not fly it). Then copy the .kmz file DJI Fly made for it to this computer: "
+    "(do not fly it). Then open the Phone screen here and press 'Use as my sample mission', or "
+    "copy the .kmz file DJI Fly made for it to this computer by hand: "
     "Android/data/dji.go.v5/files/waypoint/<long ID>/<long ID>.kmz. Avispria copies the exact "
     "format your DJI Fly uses from this file."
 )
@@ -25,10 +26,10 @@ FLY_FILE_HELP = (
 HOW_TO_FLY = (
     "Open DJI Fly, choose Waypoint Flight, add two points and save the mission. This creates "
     "a mission folder on your phone.",
-    "Connect the phone to the computer and open that mission's folder: "
-    "Android/data/dji.go.v5/files/waypoint/<long ID>/",
-    "Copy one of the .kmz files shown above into it, renamed to the long ID, replacing the "
-    "file that is there (keep a backup of the original).",
+    "Press 'Send to DJI Fly...' below: the Phone screen replaces that mission with your plan "
+    "(USB cable or Wi-Fi) and keeps the original. Or, by hand: copy one of the .kmz files above "
+    "into Android/data/dji.go.v5/files/waypoint/<long ID>/ renamed to the long ID, replacing "
+    "the file that is there (keep a backup of the original).",
     "Reopen DJI Fly, open the mission and compare the number of waypoints and the heights with "
     "the spot-check sheet (a .csv next to each .kmz) before you take off.",
 )
@@ -88,9 +89,13 @@ def show_plan(box: ui.column, result: PlanJobResult, out_dir: Path) -> None:
             for n, step in enumerate(HOW_TO_FLY, start=1):
                 ui.label(f"{n}. {step}").classes("text-sm")
         ui.label(f"Saved in {out_dir}").classes("text-sm av-muted break-all")
-        ui.button(
-            "Open the folder",
-            icon="folder_open",
-            color="secondary",
-            on_click=lambda: open_in_file_manager(out_dir),
-        ).props("no-caps")
+        with ui.row().classes("gap-3"):
+            ui.button(
+                "Send to DJI Fly...", icon="send", on_click=lambda: ui.navigate.to("/phone")
+            ).props("no-caps").mark("to-phone")
+            ui.button(
+                "Open the folder",
+                icon="folder_open",
+                color="secondary",
+                on_click=lambda: open_in_file_manager(out_dir),
+            ).props("no-caps")

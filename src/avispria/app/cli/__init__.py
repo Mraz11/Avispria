@@ -11,6 +11,7 @@ from avispria.app.cli import (  # noqa: F401  (register commands)
     engine,
     files,
     gui,
+    phone,
     plan,
     process,
 )

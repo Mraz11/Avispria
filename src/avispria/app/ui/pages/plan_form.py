@@ -120,6 +120,7 @@ class PlanFormUi:
                 "Your DJI Fly sample mission (.kmz)",
                 directory=False,
                 suffixes=(".kmz",),
+                value=STATE.sample_mission,
                 marker="template",
             )
             with ui.expansion("How do I get this file?", icon="help_outline").classes("w-full"):

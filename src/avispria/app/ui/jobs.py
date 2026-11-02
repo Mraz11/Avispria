@@ -10,7 +10,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from avispria.adapters.adb import AdbError
 from avispria.adapters.engine import EngineError
+from avispria.app.phone_workflow import SendError
 from avispria.app.process_workflow import ProcessBlockedError
 from avispria.app.workflow import PlanBlockedError
 from avispria.core.errors import PlanningError
@@ -25,6 +27,8 @@ KNOWN = (
     EngineError,
     PlanBlockedError,
     ProcessBlockedError,
+    AdbError,
+    SendError,
     ValueError,
 )
 

@@ -9,6 +9,8 @@ from collections.abc import Callable
 import anyio
 from nicegui.testing import User
 
+from avispria.app.ui.plan_job import PlanForm
+
 
 def value_of(user: User, marker: str) -> str:
     """The current text of the field with this marker."""
@@ -25,3 +27,13 @@ async def eventually(check: Callable[[], bool], timeout: float = 5.0) -> None:
     with anyio.fail_after(timeout):
         while not check():
             await anyio.sleep(0.02)
+
+
+def fill_plan_form(user: User, form: "PlanForm") -> None:  # noqa: UP037
+    """Type the values of a valid Plan a flight form into the screen, like a person would."""
+    set_text(user, "centre-input", form.centre)
+    set_text(user, "width-input", f"{form.width_m:g}")
+    set_text(user, "length-input", f"{form.length_m:g}")
+    set_text(user, "template-input", form.template)
+    set_text(user, "out-input", form.out_dir)
+    set_text(user, "target-input", "3")  # 3 cm/px keeps the test plan small

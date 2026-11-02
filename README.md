@@ -182,6 +182,7 @@ The same features are available as commands. `uv run avispria --help` lists them
 | `ui` | Open the window interface. |
 | `drones` | List the known aircraft and camera modes. |
 | `camera-from-photo` | Print a camera profile derived from one original photo. |
+| `scan` | Rings of photos around one tree, building or other object, for a 3D model: heights, camera tilts and photos worked out so the whole surface is covered. See [the object scan guide](docs/field/object-scan.md). |
 | `phone` | Talk to DJI Fly on an Android phone from the computer: `status`, `slots`, `send`, `pull`, `pair`, `connect`. |
 | `inspect`, `lint`, `sheet`, `prepare-copy` | Look inside, check, summarise and install a DJI Fly mission file. |
 

@@ -14,6 +14,7 @@ from avispria.app.cli import (  # noqa: F401  (register commands)
     phone,
     plan,
     process,
+    scan,
 )
 from avispria.app.cli._base import app
 

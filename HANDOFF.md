@@ -114,6 +114,16 @@
   waypoint 1); DJI Fly groups actions by KIND (group 1 = arrival actions incl. several in one group, 2 = evenly
   turning tilt, 4 = zoom). The writer now writes that structure, supports Waypoint.heading_deg and hover_s, and its
   default takePhoto has useGlobalPayloadLensIndex (it was missing). Zoom is read but not written.
+  OBJECT SCAN (built 2026-11-02, patch 0032; no flight yet): `avispria scan` (core/scan.py, app/scan_workflow.py,
+  docs/field/object-scan.md). Object = upright cylinder; rings at radius+standoff; ring HEIGHTS follow from the heights on
+  the surface each ring must be centred on (even, overlapping, base..top) and the tilt schedule (+10 up at the bottom,
+  -20 down at the top): camera height = centre - tan(pitch)*standoff (aiming all rings at one point squeezes coverage by
+  r/R); photos per ring = max(360/max_step 10 deg, footprint rule); top cap = nadir lattice 8 m above; spiral route (same
+  direction, same start bearing: two consecutive waypoints in the same place are refused by lint WPML011); every waypoint
+  faces the POI, stops, hovers, takes a photo, explicit tilt; whole rings per mission (99 waypoints, battery).
+  Geometry is in UTM metres (grid north differs from true north by ~2 deg here; haversine is ~0.3% short of true metres).
+  STILL TO BUILD: a Scan screen (map pin + fields) and a 3D processing preset (mesh/point cloud, not orthophoto/DSM),
+  dome pattern, wall scans (custom heading + vertical columns), oblique crosshatch, route over the map.
   MAP (built 2026-11-02, patch 0031; NOT yet seen in a real browser): Plan a flight has a third way to choose the area,
   'Draw it on a map' (ui.leaflet with the Leaflet.draw toolbar, hide_drawn_items=True). The SERVER owns the shapes
   (pages/plan_map.py AreaMap): every drawn layer is parsed (map_events.parse_layer, tolerant of the payload formats)

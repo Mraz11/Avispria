@@ -22,6 +22,11 @@ from avispria.core.wpml.template import REQUIRED_HEIGHT_MODE, DummyTemplate
 TURN_STOP = "toPointAndStopWithContinuityCurvature"  # observed in DJI Fly dummies
 TURN_PASS = "toPointAndPassWithContinuityCurvature"  # observed in DJI Fly dummies
 
+GIMBAL_MIN_DEG = -90.0  # the Lito X1's own limits, from DJI Fly's capability files
+GIMBAL_MAX_DEG = 40.0
+HEADING_FOLLOW = "followWayline"
+HEADING_POI = "towardPOI"
+
 GROUP_GIMBAL = 1  # DJI Fly: gimbalRotate at the first waypoint
 GROUP_EVENLY = 2  # DJI Fly: gimbalEvenlyRotate on every segment (id reused)
 GROUP_PHOTO = 3
@@ -110,8 +115,10 @@ def _check(mission: Mission) -> None:
             raise ValueError(f"waypoint {i} has invalid coordinates")
         if w.speed_ms <= 0:
             raise ValueError(f"waypoint {i} has a non-positive speed")
-        if not -90 <= w.gimbal_pitch_deg <= 0:
+        if not GIMBAL_MIN_DEG <= w.gimbal_pitch_deg <= GIMBAL_MAX_DEG:
             raise ValueError(f"waypoint {i} gimbal pitch out of range")
+        if w.poi is not None and not all(math.isfinite(v) for v in w.poi):
+            raise ValueError(f"waypoint {i} has a non-finite point of interest")
 
 
 def _placemark(
@@ -122,6 +129,7 @@ def _placemark(
     n: int,
     straight: bool,
     photo_params: bytes | None,
+    next_pitch: float | None = None,
 ) -> etree._Element:
     pm = copy.deepcopy(proto)
     for group in pm.findall(b.w + "actionGroup"):
@@ -134,7 +142,14 @@ def _placemark(
     b.set(pm, "index", str(i))
     b.set(pm, "executeHeight", _num(wp.height_m))
     b.set(pm, "waypointSpeed", _num(wp.speed_ms))
-    b.set(pm, "waypointHeadingParam/waypointHeadingAngleEnable", "1" if ends else "0")
+    if wp.poi is None:
+        b.set(pm, "waypointHeadingParam/waypointHeadingMode", HEADING_FOLLOW)
+        b.set(pm, "waypointHeadingParam/waypointHeadingAngleEnable", "1" if ends else "0")
+    else:  # as DJI Fly writes it: the mode, the point as lat,lon,height, and the angle enabled
+        lon, lat, height = wp.poi
+        b.set(pm, "waypointHeadingParam/waypointHeadingMode", HEADING_POI)
+        b.set(pm, "waypointHeadingParam/waypointPoiPoint", f"{lat:.6f},{lon:.6f},{height:.6f}")
+        b.set(pm, "waypointHeadingParam/waypointHeadingAngleEnable", "1")
     b.set(pm, "waypointTurnParam/waypointTurnMode", TURN_STOP if ends or wp.stop else TURN_PASS)
     b.set(pm, "useStraightLine", "1" if straight else "0")
     b.set(pm, "waypointGimbalHeadingParam/waypointGimbalPitchAngle", _num(wp.gimbal_pitch_deg))
@@ -144,8 +159,10 @@ def _placemark(
     if i == 0:
         params = b.params(_ROTATE_DEFAULTS, gimbalPitchRotateAngle=pitch)
         groups.append(b.group(GROUP_GIMBAL, 0, 0, "gimbalRotate", params))
-    if i < n - 1:
-        params = b.params(_EVENLY_DEFAULTS, gimbalPitchRotateAngle=pitch)
+    if i < n - 1 and next_pitch is not None:
+        # DJI Fly stores the tilt of waypoint i+1 here: the camera turns evenly over the leg
+        # [i, i+1] and arrives with that tilt (verified against DJI Fly's own files)
+        params = b.params(_EVENLY_DEFAULTS, gimbalPitchRotateAngle=_num(next_pitch))
         groups.append(b.group(GROUP_EVENLY, i, i + 1, "gimbalEvenlyRotate", params))
     if wp.take_photo:
         params = etree.fromstring(photo_params) if photo_params else b.params(_PHOTO_DEFAULTS)
@@ -183,7 +200,10 @@ def write_kmz(
         folder.remove(pm)
     n = len(mission.waypoints)
     for i, wp in enumerate(mission.waypoints):
-        folder.append(_placemark(b, proto, i, wp, n, straight_lines, template.photo_params_xml))
+        following = mission.waypoints[i + 1].gimbal_pitch_deg if i + 1 < n else None
+        folder.append(
+            _placemark(b, proto, i, wp, n, straight_lines, template.photo_params_xml, following)
+        )
     b.set(folder, "executeHeightMode", REQUIRED_HEIGHT_MODE)
     b.set(folder, "autoFlightSpeed", speed)
     _update_config(b, w_root, speed)

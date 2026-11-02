@@ -42,6 +42,9 @@ class Waypoint:
     surface_clearance_m: float | None
     height_above_ground_m: float | None
     stop: bool = False  # stop at this waypoint (strip ends) instead of passing through
+    # (lon, lat, height m above takeoff): the aircraft faces this point on the way to the next
+    # waypoint (DJI Fly's "POI" heading); None = follow the route
+    poi: tuple[float, float, float] | None = None
 
 
 @dataclass(frozen=True)

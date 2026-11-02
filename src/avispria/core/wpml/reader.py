@@ -4,8 +4,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
 
 from lxml import etree
 
@@ -41,8 +41,10 @@ class KmzWaypoint:
     speed_ms: float
     turn_mode: str
     straight_line: bool
-    gimbal_pitch_deg: float | None
+    gimbal_pitch_deg: float | None  # the tilt this waypoint is reached with (see arrival_tilts)
     actions: tuple[KmzAction, ...]
+    heading_mode: str = ""  # followWayline, towardPOI, ...
+    poi: tuple[float, float, float] | None = None  # (lon, lat, height m) when facing a point
 
 
 @dataclass(frozen=True)
@@ -96,6 +98,38 @@ class _Doc:
             raise KmzError(f"{self.label}: {path} is not an integer ({raw!r})") from exc
 
 
+def arrival_tilts(waypoints: Sequence[KmzWaypoint]) -> list[float | None]:
+    """The camera tilt (degrees, -90 = straight down) each waypoint is reached with.
+
+    DJI Fly does not use the waypoint's own gimbal field (it stays 0). It stores the tilt of
+    waypoint ``k`` as an action declared on waypoint ``k - 1`` that turns the camera evenly over
+    the leg ``[k - 1, k]`` (``gimbalEvenlyRotate``), or as a ``gimbalRotate`` at waypoint ``k``
+    itself (the first waypoint). A waypoint with no such action has no stored tilt: ``None``
+    (for a waypoint facing a point of interest DJI Fly aims the camera by itself).
+    """
+    tilts: list[float | None] = [None] * len(waypoints)
+    for w in waypoints:
+        for a in w.actions:
+            angle = a.params.get("gimbalPitchRotateAngle")
+            if angle is None:
+                continue
+            sets_tilt = a.func == "gimbalEvenlyRotate" or (
+                a.func == "gimbalRotate" and a.start == a.end
+            )
+            if sets_tilt and 0 <= a.end < len(tilts):
+                tilts[a.end] = float(angle)
+    return tilts
+
+
+def _poi(doc: _Doc, pm: etree._Element) -> tuple[float, float, float] | None:
+    raw = doc.text(pm, "wpml:waypointHeadingParam/wpml:waypointPoiPoint", "")
+    try:
+        lat, lon, height = (float(v) for v in raw.split(","))
+    except ValueError:
+        return None
+    return None if lat == 0.0 and lon == 0.0 else (lon, lat, height)
+
+
 def _actions(doc: _Doc, pm: etree._Element) -> tuple[KmzAction, ...]:
     out: list[KmzAction] = []
     for group in pm.findall(f"{{{doc.ns}}}actionGroup"):
@@ -140,6 +174,10 @@ def _waypoint(doc: _Doc, pm: etree._Element) -> KmzWaypoint:
         if pitch_el is None or pitch_el.text is None
         else float(pitch_el.text),
         actions=_actions(doc, pm),
+        heading_mode=doc.text(pm, "wpml:waypointHeadingParam/wpml:waypointHeadingMode", ""),
+        poi=_poi(doc, pm)
+        if doc.text(pm, "wpml:waypointHeadingParam/wpml:waypointHeadingMode", "") == "towardPOI"
+        else None,
     )
 
 
@@ -167,5 +205,12 @@ def read_mission(data: bytes) -> KmzMission:
         transit_speed_ms=doc.number(w_root, cfg + "wpml:globalTransitionalSpeed"),
         finish_action=doc.text(w_root, cfg + "wpml:finishAction", ""),
         rc_lost_action=doc.text(w_root, cfg + "wpml:executeRCLostAction", ""),
-        waypoints=tuple(_waypoint(doc, pm) for pm in folder.findall(f"{{{KML_NS}}}Placemark")),
+        waypoints=_with_tilts(
+            tuple(_waypoint(doc, pm) for pm in folder.findall(f"{{{KML_NS}}}Placemark"))
+        ),
     )
+
+
+def _with_tilts(waypoints: tuple[KmzWaypoint, ...]) -> tuple[KmzWaypoint, ...]:
+    tilts = arrival_tilts(waypoints)
+    return tuple(replace(w, gimbal_pitch_deg=t) for w, t in zip(waypoints, tilts, strict=True))

@@ -92,7 +92,8 @@ def _check_waypoints(m: KmzMission, limits: LintLimits, issues: list[Issue]) -> 
             math.isfinite(w.height_m) and limits.min_height_m <= w.height_m <= limits.max_height_m
         ):
             err("WPML008", f"waypoint {w.index}: height {w.height_m} m out of range")
-        if w.gimbal_pitch_deg is not None and not -90 <= w.gimbal_pitch_deg <= 0:
+        # the Lito X1's own limits (its capability files): -90 straight down to +40 tilted up
+        if w.gimbal_pitch_deg is not None and not -90 <= w.gimbal_pitch_deg <= 40:
             err("WPML013", f"waypoint {w.index}: gimbal pitch {w.gimbal_pitch_deg} out of range")
         speeds.append(w.speed_ms)
     if any(not (math.isfinite(s) and 0 < s <= limits.max_speed_ms) for s in speeds):

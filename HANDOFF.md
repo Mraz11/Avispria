@@ -100,6 +100,15 @@
   [0,90)). RULE: any comparison/ceil/round on a derived float needs a tolerance; tests/core/test_planner_determinism.py
   nudges inputs by 1e-12 and demands an identical plan. A 150-case hunt (squares, near-squares, rotations) found 49
   unstable cases before the fix and 0 after.
+  REAL DJI FLY SAMPLES (founder, 2026-11-02): a POI mission and a mission with per-waypoint camera angles
+  (tests/fixtures/dji_fly_poi/, shifted to Greenwich) settled the encoding of Take Photo at a waypoint, POI
+  headings and gimbal tilts: see docs/field/dji-fly-mission-format.md. BUG FIXED: the writer put waypoint i's tilt
+  on leg [i, i+1] (one waypoint late); DJI Fly stores waypoint k's tilt on leg [k-1, k]. The reader now derives
+  `gimbal_pitch_deg` from the actions (arrival_tilts) and reports heading_mode/poi; Waypoint has `poi`; camera limits
+  are the Lito's -90..+40. NEXT (decided with the founder): drawable map with shape roles (map inside / leave out /
+  band around / corridor line / keep clear), then 3D patterns (oblique crosshatch first, then orbit/dome and wall
+  scans), each needing a 3D processing preset. Map tiles: OSM tile policy forbids offline downloading and heavy
+  use, requires attribution; default OSM street, bring-your-own tile URL, no satellite default.
   STILL TO BUILD: the drawable map in Plan a flight (ui.leaflet draw_control; tiles need the internet, so optional;
   ask which basemaps); GCP upload; canopy height model.
 - Engine detection: doctor/Start screen now tell apart not running / WebODM programs running but not

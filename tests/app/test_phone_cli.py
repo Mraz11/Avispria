@@ -159,3 +159,27 @@ def test_wireless_pairing_and_connecting(phone: Path) -> None:
         "connected to 192.168.1.5:41000"
         in runner.invoke(app, ["phone", "connect", "192.168.1.5:41000"]).output
     )
+
+
+def test_send_refuses_a_mission_it_cannot_read(phone: Path, tmp_path: Path) -> None:
+    junk = "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"
+    base = phone / WAYPOINT_DIR.lstrip("/") / junk
+    base.mkdir(parents=True)
+    (base / f"{junk}.kmz").write_bytes(b"a point-of-interest mission")
+    listed = runner.invoke(app, ["phone", "slots", "--backup-dir", str(tmp_path / "b")]).output
+    assert "cannot be read: not offered as a slot" in listed
+    result = runner.invoke(
+        app,
+        [
+            "phone",
+            "send",
+            str(plan(tmp_path)),
+            "--slot",
+            junk,
+            "--yes",
+            "--backup-dir",
+            str(tmp_path / "b"),
+        ],
+    )
+    assert result.exit_code == 1 and "cannot read mission AAAAAAAA" in result.output
+    assert (base / f"{junk}.kmz").read_bytes() == b"a point-of-interest mission"  # untouched

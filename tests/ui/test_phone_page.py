@@ -104,6 +104,12 @@ async def test_sending_a_plan_replaces_the_slot_and_keeps_the_original(
     assert (fake_phone.root / kmz_path(slot).lstrip("/")).read_bytes() == plan.read_bytes()
     assert next(fake_phone.backups.glob("*_original.kmz")).read_bytes() == original
     await user.should_see("last sent: survey_01.kmz", retries=100)  # the list remembers it
+    # the refresh that shows "last sent" must not wipe the message the person has to read
+    await user.should_see("Next, on the phone")
+    await user.should_see("Sent survey_01.kmz to 59B88CA7")
+    user.notify.contains(
+        "Sent. Now close DJI Fly completely"
+    )  # and a notice that stays until dismissed
 
 
 async def test_nothing_is_sent_until_the_replacement_is_confirmed(
@@ -163,3 +169,18 @@ async def test_wifi_pairing_from_the_screen(user: User, fake_phone) -> None:  # 
     set_text(user, "pair-code-input", "000000")
     user.find(marker="pair-button").click()
     await user.should_see("Pairing failed", retries=100)
+
+
+async def test_a_mission_that_cannot_be_read_is_shown_but_never_offered(
+    user: User, fake_phone
+) -> None:  # type: ignore[no-untyped-def]
+    junk = "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"
+    base = fake_phone.root / "sdcard/Android/data/dji.go.v5/files/waypoint" / junk
+    base.mkdir(parents=True)
+    (base / f"{junk}.kmz").write_bytes(b"not a waypoint mission")
+    await user.open("/phone")
+    await user.should_see("Mission AAAAAAAA...", retries=100)
+    await user.should_see("Avispria cannot read this mission")
+    await user.should_not_see(marker="use-AAAAAAAA")  # no sample button for it
+    options = next(iter(user.find(marker="send-slot-0").elements)).options
+    assert junk not in options and fake_phone.ids[0] in options  # and not in the slot list

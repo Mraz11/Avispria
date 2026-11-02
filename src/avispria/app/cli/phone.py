@@ -93,7 +93,8 @@ def slots(
     for s in found:
         made = f"{s.created:%Y-%m-%d %H:%M}" if s.created else "unknown date"
         sent = f"   last sent by Avispria: {s.last_sent}" if s.last_sent else ""
-        typer.echo(f"  {s.guid}  {s.waypoints:3d} waypoints  made {made}{sent}")
+        note = "" if s.waypoints else "   (cannot be read: not offered as a slot)"
+        typer.echo(f"  {s.guid}  {s.waypoints:3d} waypoints  made {made}{sent}{note}")
 
 
 @phone.command()
@@ -136,6 +137,11 @@ def send(
     if target is None:
         raise _fail(
             f"There is no mission {slot} on the phone. Run `avispria phone slots` to see them."
+        )
+    if target.waypoints == 0:
+        raise _fail(
+            f"Avispria cannot read mission {target.short}... (it may not be a waypoint mission), "
+            "so it will not replace it. Choose another slot."
         )
     typer.echo(
         f"This replaces mission {target.short} ({target.waypoints} waypoints) on the phone with"

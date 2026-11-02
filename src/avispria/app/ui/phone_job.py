@@ -100,6 +100,7 @@ def check_requests(requests: list[SendRequest], slots: list[Slot]) -> None:
     if not requests:
         raise SendError("Choose a mission file to send.")
     known = {s.guid for s in slots}
+    usable = {s.guid for s in slots if s.waypoints > 0}  # only a mission we can read is a slot
     used: set[str] = set()
     for r in requests:
         if not r.guid:
@@ -107,6 +108,11 @@ def check_requests(requests: list[SendRequest], slots: list[Slot]) -> None:
         if r.guid not in known:
             raise SendError(
                 "A chosen slot is not on the phone any more. Check again and choose once more."
+            )
+        if r.guid not in usable:
+            raise SendError(
+                f"Avispria cannot read mission {r.guid[:8]}... (it may not be a waypoint mission), "
+                "so it will not replace it. Choose another slot."
             )
         if r.guid in used:
             raise SendError("The same slot is chosen twice: each mission needs its own slot.")

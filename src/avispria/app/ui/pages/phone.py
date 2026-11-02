@@ -121,6 +121,9 @@ async def phone_page() -> None:
 
         slots_card = ui.card().classes("w-full gap-3")
         send_card = ui.card().classes("w-full gap-3")
+        # the outcome of a send lives OUTSIDE the cards that are rebuilt on every check, so the
+        # refresh that follows a send cannot wipe the message the person has to read
+        result_box = ui.column().classes("w-full gap-2")
 
     def slot_cards() -> None:
         slots_card.clear()
@@ -138,15 +141,22 @@ async def phone_page() -> None:
                     with ui.column().classes("gap-0 grow"):
                         ui.label(f"Mission {slot.short}...").classes("font-medium")
                         ui.label(slot_label(slot)).classes("text-sm av-muted")
-                    ui.button(
-                        "Use as my sample mission",
-                        on_click=lambda _, g=slot.guid: use_sample(g),
-                    ).props("no-caps outline").mark(f"use-{slot.short}")
+                    if slot.waypoints > 0:
+                        ui.button(
+                            "Use as my sample mission",
+                            on_click=lambda _, g=slot.guid: use_sample(g),
+                        ).props("no-caps outline").mark(f"use-{slot.short}")
+                    else:
+                        ui.label(
+                            "Avispria cannot read this mission (it may not be a waypoint "
+                            "mission), so it is never replaced."
+                        ).classes("text-sm av-muted max-w-xs")
 
     def add_row(file_value: str = "") -> None:
         n = len(rows)
-        options = {s.guid: slot_label(s) for s in status["now"].slots}
-        default = status["now"].slots[n].guid if n < len(status["now"].slots) else None
+        usable = [s for s in status["now"].slots if s.waypoints > 0]
+        options = {s.guid: slot_label(s) for s in usable}
+        default = usable[n].guid if n < len(usable) else None
         with w["rows"], ui.column().classes("w-full gap-1"):
             field = PathField(
                 "Mission file to send (.kmz)",
@@ -185,7 +195,6 @@ async def phone_page() -> None:
             ui.button("Send to DJI Fly", icon="send", on_click=lambda: send()).props(
                 "no-caps color=primary"
             ).mark("send-button")
-            w["send"] = ui.column().classes("w-full gap-2")
 
     async def check() -> None:
         STATE.adb_path = adb_field.value
@@ -237,7 +246,7 @@ async def phone_page() -> None:
             await check()
 
     async def send() -> None:
-        send_box = w["send"]
+        send_box = result_box
         send_box.clear()
         serial = status["now"].serial
         requests = [
@@ -280,6 +289,16 @@ async def phone_page() -> None:
                     ui.label(f"{o.request.plan.name}: {o.error}").classes(
                         "av-problem-text font-medium"
                     )
+            failed = [o for o in result.value if o.error]
+            ui.notify(
+                "Sent. Now close DJI Fly completely, open it again and open the mission in "
+                "Waypoint."
+                if done and not failed
+                else "Not everything was sent: read the messages below the Send button.",
+                type="positive" if done and not failed else "warning",
+                close_button="OK",
+                timeout=0,  # stays until dismissed: it must be read, wherever the page is scrolled
+            )
             if done:
                 with ui.card().classes("w-full av-note-caution"):
                     ui.label("Next, on the phone").classes("font-bold")

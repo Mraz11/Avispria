@@ -271,6 +271,8 @@ def phone_rows(status: PhoneStatus) -> list[StatusRow]:
 
 def slot_label(slot: Slot) -> str:
     """One line describing a slot, to choose it by."""
+    if slot.waypoints == 0:
+        return f"{slot.short}... (cannot be read: not offered as a slot)"
     made = f"made {slot.created:%d %b %Y}" if slot.created else "no date"
     sent = f", last sent: {slot.last_sent}" if slot.last_sent else ""
     return f"{slot.short}... ({slot.waypoints} waypoints, {made}{sent})"

@@ -155,3 +155,18 @@ def test_a_mission_is_copied_out_as_the_sample(phone: Path, tmp_path: Path) -> N
 def test_wireless_pairing_goes_through(phone: Path) -> None:
     assert "Successfully paired" in pair_phone("", " 192.168.1.5:37123 ", " 123456 ")
     assert "connected to 192.168.1.5:41000" in connect_phone("", "192.168.1.5:41000")
+
+
+def test_a_mission_avispria_cannot_read_is_never_a_slot(phone: Path, tmp_path: Path) -> None:
+    junk = A.replace("59B88CA7", "AAAAAAAA")
+    base = phone / WAYPOINT_DIR.lstrip("/") / junk
+    base.mkdir(parents=True)
+    (base / f"{junk}.kmz").write_bytes(
+        b"not a waypoint mission"
+    )  # e.g. a point-of-interest mission
+    slots = check_phone().slots
+    assert next(s for s in slots if s.guid == junk).waypoints == 0
+    (plan,) = plans(tmp_path, 1)
+    with pytest.raises(SendError, match="cannot read mission AAAAAAAA"):
+        check_requests([SendRequest(plan, junk)], slots)
+    check_requests([SendRequest(plan, A)], slots)  # a readable one is still fine

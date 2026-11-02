@@ -86,6 +86,12 @@
   never redistribute) and a capability/ folder (same as our fixture). VERIFIED on the founder's Redmi over USB:
   adb devices, ls of the waypoint folder, push + rm of a file there. NOT verified on a real phone: the full send,
   Wi-Fi pairing, DJI Fly opening a sent mission. Tested only against tests/fakes/fake_adb.py.
+  First real-phone run (founder, 2026-10-30): adb found in the Android SDK folder by itself, Redmi connected over USB,
+  2 missions listed; one (F6C1AB6D) read as 0 waypoints (probably a point-of-interest mission): a mission Avispria
+  cannot read is never offered as a slot. BUG found by the founder: the 'Sent / Next, on the phone' message
+  vanished after a split second because the refresh after a send rebuilt the card holding it; tests passed because
+  they read the message before the refresh finished. RULE: the outcome of an action lives OUTSIDE widgets that a
+  refresh rebuilds, and a test must wait for the refresh and then check the message is still there.
   STILL TO BUILD: the drawable map in Plan a flight (ui.leaflet draw_control; tiles need the internet, so optional;
   ask which basemaps); GCP upload; canopy height model.
 - Engine detection: doctor/Start screen now tell apart not running / WebODM programs running but not

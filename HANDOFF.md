@@ -92,6 +92,14 @@
   vanished after a split second because the refresh after a send rebuilt the card holding it; tests passed because
   they read the message before the refresh finished. RULE: the outcome of an action lives OUTSIDE widgets that a
   refresh rebuilds, and a test must wait for the refresh and then check the message is still there.
+  CI FINDING (founder's screenshot, 2026-10-30): ubuntu-latest failed tests/field_page (golden survey[2] total_minutes
+  6.9086 vs 6.8819) while Windows/macOS passed. Cause: grid.auto_heading decided a SQUARE's strip direction with
+  `height > width` (and by which hull edge came first), i.e. by floating-point noise: ~1/3 of square and
+  near-square surveys changed by 0.1-1.6 s between machines (a 1e-12 relative nudge was enough to flip them).
+  Also ceil(height/spacing) on whole-number ratios. Fixed with tolerances + a fixed rule for squares (heading in
+  [0,90)). RULE: any comparison/ceil/round on a derived float needs a tolerance; tests/core/test_planner_determinism.py
+  nudges inputs by 1e-12 and demands an identical plan. A 150-case hunt (squares, near-squares, rotations) found 49
+  unstable cases before the fix and 0 after.
   STILL TO BUILD: the drawable map in Plan a flight (ui.leaflet draw_control; tiles need the internet, so optional;
   ask which basemaps); GCP upload; canopy height model.
 - Engine detection: doctor/Start screen now tell apart not running / WebODM programs running but not

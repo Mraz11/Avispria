@@ -57,7 +57,8 @@ def lawnmower(
     rotated = affinity.rotate(area, rot, origin=origin)
     minx, miny, maxx, maxy = rotated.bounds
     height = maxy - miny
-    n_lines = max(1, math.ceil(height / line_spacing_m))
+    # a ratio of 5.000000000001 is 5 lines, not 6: the digits after the 9th are arithmetic noise
+    n_lines = max(1, math.ceil(height / line_spacing_m - 1e-9))
     first = miny + (height - (n_lines - 1) * line_spacing_m) / 2.0
 
     strips: list[Strip] = []
@@ -83,8 +84,10 @@ def lawnmower(
 def auto_heading(area: Polygon) -> float:
     """Heading (0-180 deg) along the longer side of the minimum-area bounding rectangle.
 
-    Uses rotating calipers over the convex hull in plain NumPy so the result is
-    identical on every platform (no library-internal division by zero).
+    Uses rotating calipers over the convex hull in plain NumPy (no library-internal
+    division by zero). Two sides that are equal within a micrometre per metre count as
+    equal, and a square gets a fixed heading, so the result does not depend on the last
+    digits of the arithmetic, which differ between machines.
     """
     hull = area.convex_hull
     if not isinstance(hull, Polygon):  # degenerate (line-like) area
@@ -105,9 +108,17 @@ def auto_heading(area: Polygon) -> float:
     if best is None:
         raise ValueError("area has no extent to orient lines along")
     _, ux, uy, width, height = best
-    if height > width:  # follow the longer side
+    tolerance = 1e-6 * max(width, height)  # a micrometre per metre: far above arithmetic noise
+    if height > width + tolerance:  # follow the longer side
         ux, uy = -uy, ux
     heading = math.degrees(math.atan2(ux, uy)) % 180.0
+    if abs(height - width) <= tolerance:
+        # A square: both directions are equally long, and which edge is met first (and whether
+        # `height > width` holds) is decided by the last digits of the arithmetic, which differ
+        # between machines. Choose by a fixed rule instead: the direction in [0, 90) degrees.
+        heading %= 90.0
+        if math.isclose(heading, 90.0, abs_tol=1e-6):
+            heading = 0.0
     return 0.0 if math.isclose(heading, 180.0, abs_tol=1e-9) else heading
 
 

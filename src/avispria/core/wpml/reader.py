@@ -45,6 +45,9 @@ class KmzWaypoint:
     actions: tuple[KmzAction, ...]
     heading_mode: str = ""  # followWayline, towardPOI, ...
     poi: tuple[float, float, float] | None = None  # (lon, lat, height m) when facing a point
+    heading_angle_deg: float | None = None  # a custom (fixed) heading, as typed in the app
+    hover_s: float | None = None  # waiting time at the waypoint
+    zoom_factor: float | None = None  # a zoom action (1-4x), read only
 
 
 @dataclass(frozen=True)
@@ -121,6 +124,36 @@ def arrival_tilts(waypoints: Sequence[KmzWaypoint]) -> list[float | None]:
     return tilts
 
 
+def _custom_heading(doc: _Doc, pm: etree._Element) -> float | None:
+    """The angle of a custom heading (DJI Fly stores it as smoothTransition + an angle)."""
+    mode = doc.text(pm, "wpml:waypointHeadingParam/wpml:waypointHeadingMode", "")
+    if mode not in ("smoothTransition", "fixed"):
+        return None
+    return doc.number(pm, "wpml:waypointHeadingParam/wpml:waypointHeadingAngle", "0")
+
+
+def _action_number(doc: _Doc, pm: etree._Element, func: str, param: str) -> float | None:
+    for group in pm.findall(f"{{{doc.ns}}}actionGroup"):
+        for action in group.findall(f"{{{doc.ns}}}action"):
+            if doc.text(action, "wpml:actionActuatorFunc", "") == func:
+                value = doc.text(action, f"wpml:actionActuatorFuncParam/wpml:{param}", "")
+                try:
+                    return float(value)
+                except ValueError:
+                    return None
+    return None
+
+
+def _zoom(doc: _Doc, pm: etree._Element) -> float | None:
+    for group in pm.findall(f"{{{doc.ns}}}actionGroup"):
+        for action in group.findall(f"{{{doc.ns}}}action"):
+            if doc.text(action, "wpml:actionActuatorFunc", "") == "zoom":
+                use = doc.text(action, "wpml:actionActuatorFuncParam/wpml:isUseFocalFactor", "0")
+                if use == "1":
+                    return _action_number(doc, pm, "zoom", "focalFactor")
+    return None
+
+
 def _poi(doc: _Doc, pm: etree._Element) -> tuple[float, float, float] | None:
     raw = doc.text(pm, "wpml:waypointHeadingParam/wpml:waypointPoiPoint", "")
     try:
@@ -174,6 +207,9 @@ def _waypoint(doc: _Doc, pm: etree._Element) -> KmzWaypoint:
         if pitch_el is None or pitch_el.text is None
         else float(pitch_el.text),
         actions=_actions(doc, pm),
+        heading_angle_deg=_custom_heading(doc, pm),
+        hover_s=_action_number(doc, pm, "hover", "hoverTime"),
+        zoom_factor=_zoom(doc, pm),
         heading_mode=doc.text(pm, "wpml:waypointHeadingParam/wpml:waypointHeadingMode", ""),
         poi=_poi(doc, pm)
         if doc.text(pm, "wpml:waypointHeadingParam/wpml:waypointHeadingMode", "") == "towardPOI"

@@ -45,6 +45,8 @@ class Waypoint:
     # (lon, lat, height m above takeoff): the aircraft faces this point on the way to the next
     # waypoint (DJI Fly's "POI" heading); None = follow the route
     poi: tuple[float, float, float] | None = None
+    heading_deg: float | None = None  # a fixed heading (DJI Fly "Custom"), degrees from north
+    hover_s: float = 0.0  # wait this long at the waypoint (DJI Fly "Hover")
 
 
 @dataclass(frozen=True)

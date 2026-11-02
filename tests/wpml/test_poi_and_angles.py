@@ -10,6 +10,7 @@ waypoints facing one point of interest (Gimbal Tilt "POI 1" in the app), a photo
 
 import re
 import zipfile
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -187,3 +188,98 @@ def test_the_linter_uses_the_same_camera_limits(pitch: float, flagged: bool) -> 
             z.writestr(name, data)
     codes = {i.code for i in lint_kmz(buffer.getvalue(), LintLimits())}
     assert ("WPML013" in codes) == flagged
+
+
+CUSTOM = (FIXTURES / "dji_fly_poi" / "custom_3wp.kmz").read_bytes()
+
+
+def raw_headings(data: bytes) -> list[tuple[str, str, str]]:
+    text = zipfile.ZipFile(__import__("io").BytesIO(data)).read("wpmz/waylines.wpml").decode()
+    return re.findall(
+        r"<wpml:waypointHeadingMode>(\w+)</wpml:waypointHeadingMode>\s*"
+        r"<wpml:waypointHeadingAngle>(-?[\d.]+)</wpml:waypointHeadingAngle>.*?"
+        r"<wpml:waypointHeadingAngleEnable>(\d)</wpml:waypointHeadingAngleEnable>",
+        text,
+        flags=re.S,
+    )
+
+
+def test_the_real_custom_mission_shows_how_dji_fly_stores_heading_hover_zoom_and_speed() -> None:
+    m = read_mission(CUSTOM)
+    # "Custom 90 / 180" is the mode smoothTransition plus the angle; the last one follows the course
+    assert [(w.heading_mode, w.heading_angle_deg) for w in m.waypoints] == [
+        ("smoothTransition", 90.0),
+        ("smoothTransition", 180.0),
+        ("followWayline", None),
+    ]
+    assert [w.hover_s for w in m.waypoints] == [3.0, None, None]
+    assert [w.zoom_factor for w in m.waypoints] == [2.0, None, None]
+    assert [w.speed_ms for w in m.waypoints] == [2.5, 1.0, 2.5]  # waypoint 2 has its own speed
+    assert [w.gimbal_pitch_deg for w in m.waypoints] == [0.0, 0.0, 20.0]  # tilting up is possible
+    # DJI Fly groups actions by kind: arrival actions share group 1, tilt turns are 2, zoom is 4
+    assert [(a.group_id, a.func) for a in m.waypoints[0].actions] == [
+        (1, "gimbalRotate"),
+        (1, "hover"),
+        (4, "zoom"),
+        (2, "gimbalEvenlyRotate"),
+    ]
+    assert [(a.group_id, a.func) for a in m.waypoints[2].actions] == [(1, "takePhoto")]
+
+
+def test_a_custom_heading_a_hover_and_a_photo_are_written_the_way_dji_fly_writes_them() -> None:
+    waypoints = [
+        replace(wp(0, 0.0), heading_deg=90.0, hover_s=3.0),
+        replace(wp(1, 0.0), heading_deg=180.0, speed_ms=1.0),
+        wp(2, 20.0, photo=True),
+    ]
+    out = write_kmz(DummyTemplate.from_kmz(DUMMY), mission(waypoints), now_ms=NOW)
+    ours, real = read_mission(out), read_mission(CUSTOM)
+    assert (
+        raw_headings(out)
+        == raw_headings(CUSTOM)
+        == [
+            ("smoothTransition", "90", "1"),
+            ("smoothTransition", "180", "0"),
+            ("followWayline", "0", "1"),
+        ]
+    )
+    assert [(w.heading_angle_deg, w.hover_s, w.speed_ms) for w in ours.waypoints] == [
+        (90.0, 3.0, 3.0),
+        (180.0, None, 1.0),
+        (None, None, 3.0),
+    ]
+    kinds = lambda m, i: [(a.group_id, a.func) for a in m.waypoints[i].actions if a.func != "zoom"]  # noqa: E731
+    assert [kinds(ours, i) for i in range(3)] == [kinds(real, i) for i in range(3)]
+    ids = [a.action_id for w in ours.waypoints for a in w.actions]
+    assert ids == sorted(set(ids))  # unique and increasing in file order
+    assert [i for i in lint_kmz(out, LintLimits()) if i.level == "error"] == []
+
+
+def test_a_photo_at_a_waypoint_carries_the_same_parameters_as_dji_flys_own() -> None:
+    out = write_kmz(DummyTemplate.from_kmz(DUMMY), mission([wp(0), wp(1, photo=True)]), now_ms=NOW)
+    ours = [a for w in read_mission(out).waypoints for a in w.actions if a.func == "takePhoto"]
+    real = [a for w in read_mission(POI).waypoints for a in w.actions if a.func == "takePhoto"]
+    assert (
+        dict(ours[0].params)
+        == dict(real[0].params)
+        == {
+            "payloadPositionIndex": "0",
+            "useGlobalPayloadLensIndex": "0",
+        }
+    )  # the first sample had no photo, so the default had been a guess
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"heading_deg": 181.0}, "heading must be between"),
+        ({"heading_deg": -181.0}, "heading must be between"),
+        ({"hover_s": -1.0}, "invalid hover time"),
+        ({"hover_s": float("nan")}, "invalid hover time"),
+        ({"heading_deg": 10.0, "poi": (0.0, 51.0, 10.0)}, "cannot both face a point"),
+    ],
+)
+def test_headings_and_hovers_that_make_no_sense_are_refused(change: dict, message: str) -> None:  # type: ignore[type-arg]
+    waypoints = [replace(wp(0), **change), wp(1)]
+    with pytest.raises(ValueError, match=message):
+        write_kmz(DummyTemplate.from_kmz(DUMMY), mission(waypoints), now_ms=NOW)

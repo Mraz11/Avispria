@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import copy
 import math
+from collections.abc import Sequence
 
 from lxml import etree
 
@@ -27,9 +28,12 @@ GIMBAL_MAX_DEG = 40.0
 HEADING_FOLLOW = "followWayline"
 HEADING_POI = "towardPOI"
 
-GROUP_GIMBAL = 1  # DJI Fly: gimbalRotate at the first waypoint
-GROUP_EVENLY = 2  # DJI Fly: gimbalEvenlyRotate on every segment (id reused)
-GROUP_PHOTO = 3
+# DJI Fly groups actions by kind (read from its own files): everything done on arrival at a
+# waypoint (the camera set-up at the first one, a hover, a photo) is ONE group; the evenly
+# turning tilt is another.
+GROUP_ARRIVAL = 1
+GROUP_EVENLY = 2
+HEADING_CUSTOM = "smoothTransition"  # DJI Fly "Custom": the mode plus the angle typed in the app
 
 _ROTATE_DEFAULTS = (
     ("gimbalHeadingYawBase", "aircraft"),
@@ -49,7 +53,8 @@ _EVENLY_DEFAULTS = (
     ("gimbalRollRotateAngle", "0"),
     ("payloadPositionIndex", "0"),
 )
-_PHOTO_DEFAULTS = (("payloadPositionIndex", "0"),)
+_PHOTO_DEFAULTS = (("payloadPositionIndex", "0"), ("useGlobalPayloadLensIndex", "0"))
+_HOVER_DEFAULTS = (("hoverTime", "0"),)
 
 
 def _num(value: float) -> str:
@@ -81,7 +86,11 @@ class _Builder:
         return node
 
     def group(
-        self, group_id: int, start: int, end: int, func: str, params: etree._Element
+        self,
+        group_id: int,
+        start: int,
+        end: int,
+        actions: Sequence[tuple[str, etree._Element]],
     ) -> etree._Element:
         g = self.el("actionGroup")
         for tag, text in (
@@ -94,12 +103,13 @@ class _Builder:
         trigger = self.el("actionTrigger")
         trigger.append(self.el("actionTriggerType", "reachPoint"))
         g.append(trigger)
-        action = self.el("action")
-        action.append(self.el("actionId", str(self.next_action_id)))
-        action.append(self.el("actionActuatorFunc", func))
-        action.append(params)
-        g.append(action)
-        self.next_action_id += 1
+        for func, params in actions:
+            action = self.el("action")
+            action.append(self.el("actionId", str(self.next_action_id)))
+            action.append(self.el("actionActuatorFunc", func))
+            action.append(params)
+            g.append(action)
+            self.next_action_id += 1
         return g
 
 
@@ -119,6 +129,12 @@ def _check(mission: Mission) -> None:
             raise ValueError(f"waypoint {i} gimbal pitch out of range")
         if w.poi is not None and not all(math.isfinite(v) for v in w.poi):
             raise ValueError(f"waypoint {i} has a non-finite point of interest")
+        if w.poi is not None and w.heading_deg is not None:
+            raise ValueError(f"waypoint {i} cannot both face a point and have a fixed heading")
+        if w.heading_deg is not None and not -180.0 <= w.heading_deg <= 180.0:
+            raise ValueError(f"waypoint {i} heading must be between -180 and 180 degrees")
+        if not (math.isfinite(w.hover_s) and w.hover_s >= 0):
+            raise ValueError(f"waypoint {i} has an invalid hover time")
 
 
 def _placemark(
@@ -142,31 +158,41 @@ def _placemark(
     b.set(pm, "index", str(i))
     b.set(pm, "executeHeight", _num(wp.height_m))
     b.set(pm, "waypointSpeed", _num(wp.speed_ms))
-    if wp.poi is None:
-        b.set(pm, "waypointHeadingParam/waypointHeadingMode", HEADING_FOLLOW)
-        b.set(pm, "waypointHeadingParam/waypointHeadingAngleEnable", "1" if ends else "0")
-    else:  # as DJI Fly writes it: the mode, the point as lat,lon,height, and the angle enabled
+    if wp.poi is not None:  # as DJI Fly writes it: the mode, the point as lat,lon,height
         lon, lat, height = wp.poi
         b.set(pm, "waypointHeadingParam/waypointHeadingMode", HEADING_POI)
+        b.set(pm, "waypointHeadingParam/waypointHeadingAngle", "0")
         b.set(pm, "waypointHeadingParam/waypointPoiPoint", f"{lat:.6f},{lon:.6f},{height:.6f}")
         b.set(pm, "waypointHeadingParam/waypointHeadingAngleEnable", "1")
+    elif wp.heading_deg is not None:  # "Custom": the mode and the angle typed in the app
+        b.set(pm, "waypointHeadingParam/waypointHeadingMode", HEADING_CUSTOM)
+        b.set(pm, "waypointHeadingParam/waypointHeadingAngle", _num(wp.heading_deg))
+        b.set(pm, "waypointHeadingParam/waypointHeadingAngleEnable", "1" if ends else "0")
+    else:
+        b.set(pm, "waypointHeadingParam/waypointHeadingMode", HEADING_FOLLOW)
+        b.set(pm, "waypointHeadingParam/waypointHeadingAngle", "0")
+        b.set(pm, "waypointHeadingParam/waypointHeadingAngleEnable", "1" if ends else "0")
     b.set(pm, "waypointTurnParam/waypointTurnMode", TURN_STOP if ends or wp.stop else TURN_PASS)
     b.set(pm, "useStraightLine", "1" if straight else "0")
     b.set(pm, "waypointGimbalHeadingParam/waypointGimbalPitchAngle", _num(wp.gimbal_pitch_deg))
 
-    pitch = _num(wp.gimbal_pitch_deg)
     groups = []
-    if i == 0:
-        params = b.params(_ROTATE_DEFAULTS, gimbalPitchRotateAngle=pitch)
-        groups.append(b.group(GROUP_GIMBAL, 0, 0, "gimbalRotate", params))
+    on_arrival: list[tuple[str, etree._Element]] = []
+    if i == 0:  # the camera's starting tilt
+        rotate = b.params(_ROTATE_DEFAULTS, gimbalPitchRotateAngle=_num(wp.gimbal_pitch_deg))
+        on_arrival.append(("gimbalRotate", rotate))
+    if wp.hover_s > 0:
+        on_arrival.append(("hover", b.params(_HOVER_DEFAULTS, hoverTime=_num(wp.hover_s))))
+    if wp.take_photo:
+        shot = etree.fromstring(photo_params) if photo_params else b.params(_PHOTO_DEFAULTS)
+        on_arrival.append(("takePhoto", shot))
+    if on_arrival:
+        groups.append(b.group(GROUP_ARRIVAL, i, i, on_arrival))
     if i < n - 1 and next_pitch is not None:
         # DJI Fly stores the tilt of waypoint i+1 here: the camera turns evenly over the leg
         # [i, i+1] and arrives with that tilt (verified against DJI Fly's own files)
-        params = b.params(_EVENLY_DEFAULTS, gimbalPitchRotateAngle=_num(next_pitch))
-        groups.append(b.group(GROUP_EVENLY, i, i + 1, "gimbalEvenlyRotate", params))
-    if wp.take_photo:
-        params = etree.fromstring(photo_params) if photo_params else b.params(_PHOTO_DEFAULTS)
-        groups.append(b.group(GROUP_PHOTO, i, i, "takePhoto", params))
+        tilt = b.params(_EVENLY_DEFAULTS, gimbalPitchRotateAngle=_num(next_pitch))
+        groups.append(b.group(GROUP_EVENLY, i, i + 1, [("gimbalEvenlyRotate", tilt)]))
     anchor = pm.find(b.w + "waypointGimbalHeadingParam")
     for g in groups:
         if anchor is not None:

@@ -109,6 +109,11 @@
   band around / corridor line / keep clear), then 3D patterns (oblique crosshatch first, then orbit/dome and wall
   scans), each needing a 3D processing preset. Map tiles: OSM tile policy forbids offline downloading and heavy
   use, requires attribution; default OSM street, bring-your-own tile URL, no satellite default.
+  Third real sample (custom heading, hover 3 s, zoom 2x, own speed, tilt +20, first-waypoint camera set-up):
+  heading Custom = smoothTransition + angle; hover = `hover` action; zoom = `zoom` action (group 4, seen only at
+  waypoint 1); DJI Fly groups actions by KIND (group 1 = arrival actions incl. several in one group, 2 = evenly
+  turning tilt, 4 = zoom). The writer now writes that structure, supports Waypoint.heading_deg and hover_s, and its
+  default takePhoto has useGlobalPayloadLensIndex (it was missing). Zoom is read but not written.
   STILL TO BUILD: the drawable map in Plan a flight (ui.leaflet draw_control; tiles need the internet, so optional;
   ask which basemaps); GCP upload; canopy height model.
 - Engine detection: doctor/Start screen now tell apart not running / WebODM programs running but not

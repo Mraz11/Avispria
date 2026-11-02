@@ -8,15 +8,15 @@ from avispria.app.ui.inputs import parse_latlon_text
 @pytest.mark.parametrize(
     "text",
     [
-        "23.8290, 90.4170",
-        "23.8290,90.4170",
-        " 23.8290   90.4170 ",
-        "23.8290; 90.4170",
-        "23.8290\N{DEGREE SIGN} 90.4170",
+        "12.3456, 98.7654",
+        "12.3456,98.7654",
+        " 12.3456   98.7654 ",
+        "12.3456; 98.7654",
+        "12.3456\N{DEGREE SIGN} 98.7654",
     ],
 )
 def test_latitude_and_longitude_are_read_flexibly(text: str) -> None:
-    assert parse_latlon_text(text) == (23.8290, 90.4170)
+    assert parse_latlon_text(text) == (12.3456, 98.7654)
 
 
 @pytest.mark.parametrize(
@@ -28,7 +28,7 @@ def test_latitude_and_longitude_are_read_flexibly(text: str) -> None:
         ("north, east", "two numbers"),
         ("95, 10", "Latitude 95 is not between"),
         ("10, 190", "Longitude 190 is not between"),
-        ("90.4170, 23.8290", "Latitude comes first"),  # the usual mix-up: longitude typed first
+        ("98.7654, 12.3456", "Latitude comes first"),  # the usual mix-up: longitude typed first
     ],
 )
 def test_bad_coordinates_say_what_to_do(text: str, message: str) -> None:

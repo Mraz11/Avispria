@@ -114,8 +114,22 @@
   waypoint 1); DJI Fly groups actions by KIND (group 1 = arrival actions incl. several in one group, 2 = evenly
   turning tilt, 4 = zoom). The writer now writes that structure, supports Waypoint.heading_deg and hover_s, and its
   default takePhoto has useGlobalPayloadLensIndex (it was missing). Zoom is read but not written.
-  STILL TO BUILD: the drawable map in Plan a flight (ui.leaflet draw_control; tiles need the internet, so optional;
-  ask which basemaps); GCP upload; canopy height model.
+  MAP (built 2026-11-02, patch 0031; NOT yet seen in a real browser): Plan a flight has a third way to choose the area,
+  'Draw it on a map' (ui.leaflet with the Leaflet.draw toolbar, hide_drawn_items=True). The SERVER owns the shapes
+  (pages/plan_map.py AreaMap): every drawn layer is parsed (map_events.parse_layer, tolerant of the payload formats)
+  into core/shapes.py DrawnShape with a ROLE: inside (map it), leave_out (a hole), band (a ring of N m OUTSIDE the
+  shape = 'map the outside of the polygon'), corridor (a line made a strip N m wide); build_area() combines them in a
+  local UTM frame (union of mapped minus union of left-out, simplified 0.25 m, pieces under 100 m2 dropped) into
+  polygons the planner already accepts (ONE polygon at a time, holes allowed; separate pieces are planned one by one
+  via a chooser). Editing is in the list under the map, not Leaflet's own edit tools (the edit toolbar is empty
+  because drawn items are hidden). The widget's default OSM layer is REMOVED at creation; the background is an opt-in
+  switch (OSM tile policy: attribution, no offline use) or the person's own tile URL. 'Leave out' only means not
+  planned for coverage: the planner still overruns strip ends into the hole and may fly across it (6 waypoints
+  inside a 50 m hole in the test); a real 'keep clear' needs routing and is NOT built. Takeoff = the pin (also written
+  into the takeoff box, and cleared with it). Tests hand the map what the toolbar would send (AreaMap.add_drawn); the
+  browser-side drawing, tile loading and the exact draw:created payload are UNVERIFIED (founder to test with
+  screenshots). STILL TO BUILD: route over the map after planning; vertex editing; 'keep clear'; GCP upload;
+  canopy height model; 3D patterns (oblique crosshatch, orbit/dome, wall).
 - Engine detection: doctor/Start screen now tell apart not running / WebODM programs running but not
   answering (starting, or started as administrator so Windows hides their ports) / running; Check again
   button on Start. The founder's Windows PC reported 'No WebODM-related programs are listening'.

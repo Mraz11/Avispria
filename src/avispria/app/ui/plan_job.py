@@ -32,12 +32,14 @@ class FormError(ValueError):
 @dataclass(frozen=True)
 class PlanForm:
     # survey area
-    area_mode: str = "numbers"  # "numbers" or "file"
+    area_mode: str = "numbers"  # "numbers", "file" or "drawn" (on the map)
     centre: str = ""  # "latitude, longitude"
     width_m: float = 200.0
     length_m: float = 300.0
     area_heading_deg: float = 0.0
     aoi_file: str = ""
+    drawn_area_geojson: str = ""  # the area drawn on the map: a GeoJSON polygon (may have holes)
+    drawn_area_problem: str = ""  # why there is none, in the map's own words
     takeoff: str = ""  # empty: the centre of the area
     # aircraft
     aircraft: str = "lito-x1"
@@ -110,6 +112,13 @@ def _area(form: PlanForm) -> tuple[Polygon, Path | None]:
             ), None
         except ValueError as exc:
             raise FormError(f"Survey area: {exc}") from None
+    if form.area_mode == "drawn":
+        if not form.drawn_area_geojson.strip():
+            raise FormError(form.drawn_area_problem or "Draw the survey area on the map first.")
+        try:
+            return load_aoi(json.loads(form.drawn_area_geojson)), None
+        except ValueError as exc:  # includes bad JSON and an area the planner cannot use
+            raise FormError(f"The area drawn on the map could not be used: {exc}") from None
     path = _file(form.aoi_file, "survey area file", (".geojson", ".json"))
     try:
         return load_aoi(json.loads(path.read_text(encoding="utf-8"))), path

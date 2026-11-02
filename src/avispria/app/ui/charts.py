@@ -120,6 +120,16 @@ def route_map(
             "lineStyle": {"type": "dashed", "color": palette.outline, "width": 2},
         }
     ]
+    for ring in aoi.interiors:  # parts left out of the area (drawn on the map)
+        series.append(
+            {
+                "name": "Left out",
+                "type": "line",
+                "data": local(list(ring.coords)),
+                "showSymbol": False,
+                "lineStyle": {"type": "dotted", "color": palette.outline, "width": 2},
+            }
+        )
     every: list[list[float]] = list(outline)
     for n, mission in enumerate(result.missions):
         route = local([(w.lon, w.lat) for w in mission.waypoints])

@@ -148,7 +148,7 @@ Start it as described above. It has four screens and a light/dark switch in the 
 |---|---|
 | **Start** | Shows what your computer can do and whether WebODM is running. |
 | **Check my photos** | A verdict, the key numbers, a map of where each photo was taken, and every warning explained in plain words ("what it means" and "what to do"). Optionally uses an elevation model so results are right over hills. |
-| **Plan a flight** | Describe the area (by numbers or a map file), your drone and what you need; get DJI Fly mission files, the route on a map, and the prediction of what you will really get. |
+| **Plan a flight** | Describe the area (by numbers, a map file, or by **drawing it on a map**: polygon, rectangle, circle or line, with parts left out and bands around shapes), your drone and what you need; get DJI Fly mission files, the route on a map, and the prediction of what you will really get. |
 | **Make maps** | Pick the photos and a quality level; Avispria checks that your computer can handle the job, follows the progress (you can cancel), and gives you the orthophoto, surface model and point cloud. |
 | **Phone** | Sends a plan straight into DJI Fly on your Android phone (USB cable or Wi-Fi), with the original kept, and copies a mission from the phone to use as your sample. See [the phone guide](docs/field/phone-bridge.md). |
 
@@ -187,7 +187,7 @@ The same features are available as commands. `uv run avispria --help` lists them
 
 Examples (on Windows write paths with backslashes):
 
-    uv run avispria plan area.geojson --template my_dummy.kmz --takeoff 23.8290,90.4170 \
+    uv run avispria plan area.geojson --template my_dummy.kmz --takeoff 12.3456,98.7654 \
         --gsd-cm 2 --dem dem.tif --out out/survey
     uv run avispria qa photos/ --recursive
     uv run avispria doctor photos/

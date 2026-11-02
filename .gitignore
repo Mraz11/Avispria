@@ -42,3 +42,8 @@ htmlcov/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Real missions pulled from a phone (avispria phone pull --out samples) carry real coordinates:
+# never commit them. Test fixtures are made from them with the coordinates moved.
+samples/
+phone-samples/

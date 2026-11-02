@@ -141,3 +141,19 @@ def fake_phone(tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
         )
     monkeypatch.setattr(phone_job, "default_sample_dir", lambda: tmp_path / "samples")
     return SimpleNamespace(root=root, ids=ids, sample=sample, backups=tmp_path / "backups")
+
+
+@pytest.fixture
+def maps(monkeypatch):  # type: ignore[no-untyped-def]
+    """Every drawing map the Plan screen creates, so a test can 'draw' on it like a person would."""
+    from avispria.app.ui.pages import plan_form, plan_map
+
+    created: list = []
+
+    class Recording(plan_map.AreaMap):
+        def __init__(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
+            super().__init__(*args, **kwargs)
+            created.append(self)
+
+    monkeypatch.setattr(plan_form, "AreaMap", Recording)
+    return created

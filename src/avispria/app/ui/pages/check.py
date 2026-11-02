@@ -120,7 +120,7 @@ async def check_page() -> None:
                 marker="dem",
             )
             takeoff = (
-                ui.input("Takeoff point: latitude, longitude", placeholder="23.8290, 90.4170")
+                ui.input("Takeoff point: latitude, longitude", placeholder="12.3456, 98.7654")
                 .props("outlined dense")
                 .classes("w-full")
                 .mark("takeoff-input")

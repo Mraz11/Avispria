@@ -7,6 +7,7 @@ from __future__ import annotations
 from nicegui import ui
 
 from avispria.adapters.profiles import DroneProfile
+from avispria.app.ui.pages.plan_map import AreaMap
 from avispria.app.ui.pages.plan_results import FLY_FILE_HELP
 from avispria.app.ui.plan_job import PlanForm
 from avispria.app.ui.state import STATE
@@ -57,7 +58,11 @@ class PlanFormUi:
         with _card("1. The survey area"):
             self.mode = (
                 ui.radio(
-                    {"numbers": "Describe it with numbers", "file": "Use a map file"},
+                    {
+                        "numbers": "Describe it with numbers",
+                        "drawn": "Draw it on a map",
+                        "file": "Use a map file",
+                    },
                     value="numbers",
                 )
                 .props("inline")
@@ -80,6 +85,9 @@ class PlanFormUi:
                         min=0,
                         max=360,
                     )
+            self.area_map: AreaMap | None = None
+            self._map_box = _show_when(self.mode, "drawn")
+            self.mode.on_value_change(lambda _: self._open_map())
             with _show_when(self.mode, "file", gap="gap-1"):
                 self.aoi_file = PathField(
                     "Survey area file (GeoJSON)",
@@ -93,6 +101,12 @@ class PlanFormUi:
                 "Takeoff point: latitude, longitude (empty = the middle of the area)",
                 "takeoff-input",
             )
+
+    def _open_map(self) -> None:
+        """Build the map the first time it is wanted (a map made while hidden draws wrongly)."""
+        if self.mode.value == "drawn" and self.area_map is None:
+            with self._map_box:
+                self.area_map = AreaMap(on_takeoff=lambda text: self.takeoff.set_value(text))
 
     # --------------------------------------------------------------- 2. the drone
     def _drone_card(self, names: dict[str, str]) -> None:
@@ -263,6 +277,16 @@ class PlanFormUi:
             )
 
     # ------------------------------------------------------------------ reading it
+    def _drawn_geojson(self) -> str:
+        if self.mode.value == "drawn" and self.area_map is not None:
+            return self.area_map.geojson()
+        return ""
+
+    def _drawn_problem(self) -> str:
+        if self.mode.value == "drawn" and self.area_map is not None:
+            return self.area_map.problem or ""
+        return ""
+
     def collect(self) -> PlanForm:
         return PlanForm(
             area_mode=self.mode.value,
@@ -271,6 +295,8 @@ class PlanFormUi:
             length_m=self.length.value or 0.0,
             area_heading_deg=self.area_heading.value or 0.0,
             aoi_file=self.aoi_file.value,
+            drawn_area_geojson=self._drawn_geojson(),
+            drawn_area_problem=self._drawn_problem(),
             takeoff=self.takeoff.value or "",
             aircraft=self.aircraft.value,
             camera_mode=self.camera.value or "",

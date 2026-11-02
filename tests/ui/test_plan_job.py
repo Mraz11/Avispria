@@ -135,3 +135,53 @@ def test_the_template_must_be_a_kmz_and_the_area_file_valid(
     bad.write_text("{not json")
     with pytest.raises(FormError, match="could not be used"):
         build_inputs(replace(plan_form, area_mode="file", aoi_file=str(bad)))
+
+
+def _drawn(polygon_json: dict) -> str:  # type: ignore[type-arg]
+    import json
+
+    return json.dumps(polygon_json)
+
+
+def test_an_area_drawn_on_the_map_with_a_hole_is_planned_and_kept_with_the_plan(
+    plan_form, tmp_path
+) -> None:  # type: ignore[no-untyped-def]
+    import json
+    from dataclasses import replace
+    from pathlib import Path
+
+    from shapely.geometry import mapping
+
+    from avispria.app.ui.plan_job import execute_plan
+    from avispria.core.shapes import DrawnShape, Role, build_area
+
+    ring = [(90.4120, 23.8100), (90.4140, 23.8100), (90.4140, 23.8118), (90.4120, 23.8118)]
+    hole = [(90.4128, 23.8106), (90.4132, 23.8106), (90.4132, 23.8110), (90.4128, 23.8110)]
+    shapes = [
+        DrawnShape(1, "rectangle", tuple(ring)),
+        DrawnShape(2, "rectangle", tuple(hole), role=Role.LEAVE_OUT),
+    ]
+    (piece,) = build_area(shapes).pieces
+    assert len(piece.polygon.interiors) == 1
+    form = replace(
+        plan_form, area_mode="drawn", drawn_area_geojson=_drawn(mapping(piece.polygon)), centre=""
+    )
+    result = execute_plan(form)
+    assert result.outputs is not None and result.blocked == []
+    saved = json.loads((Path(form.out_dir) / "survey_area.geojson").read_text())
+    assert saved["type"] == "Polygon" and len(saved["coordinates"]) == 2  # outline and the hole
+    assert result.aoi is not None and len(result.aoi.interiors) == 1
+
+
+def test_a_drawn_area_that_is_missing_or_unusable_is_explained(plan_form) -> None:  # type: ignore[no-untyped-def]
+    from dataclasses import replace
+
+    from avispria.app.ui.plan_job import FormError, build_inputs
+
+    with pytest.raises(FormError, match="Draw the survey area on the map first"):
+        build_inputs(replace(plan_form, area_mode="drawn"))
+    with pytest.raises(FormError, match="could not be used"):
+        build_inputs(replace(plan_form, area_mode="drawn", drawn_area_geojson="not json"))
+    multi = '{"type":"MultiPolygon","coordinates":[]}'
+    with pytest.raises(FormError, match="single Polygon"):
+        build_inputs(replace(plan_form, area_mode="drawn", drawn_area_geojson=multi))

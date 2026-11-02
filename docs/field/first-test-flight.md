@@ -30,7 +30,7 @@ Use your ORIGINAL DJI Fly dummy KMZ (not the shifted test fixture):
 ```powershell
 uv run avispria plan probe.geojson `
   --template C:\path\to\37924189-3F0F-4792-AA10-D50082167E9C.kmz `
-  --takeoff 23.8290,90.4170 `
+  --takeoff 12.3456,98.7654 `
   --agl 30 --flat --mode 12mp `
   --max-distance 200 --name probe `
   --out out\probe

@@ -8,10 +8,10 @@ import re
 
 
 def parse_latlon_text(text: str) -> tuple[float, float]:
-    """Latitude and longitude from text like ``23.8290, 90.4170`` (comma or space)."""
+    """Latitude and longitude from text like ``12.3456, 98.7654`` (comma or space)."""
     cleaned = text.replace(";", ",").replace("\N{DEGREE SIGN}", " ").strip()
     parts = [p for p in re.split(r"[,\s]+", cleaned) if p]
-    example = "Enter latitude and longitude as two numbers, like 23.8290, 90.4170"
+    example = "Enter latitude and longitude as two numbers, like 12.3456, 98.7654"
     if len(parts) != 2:
         raise ValueError(example)
     try:

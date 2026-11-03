@@ -12,6 +12,7 @@ import typer
 
 from avispria.app.cli._base import app, print_issues
 from avispria.app.workflow import PlanBlockedError, prepare_copy
+from avispria.core.route import clock, route_length_m, route_seconds
 from avispria.core.wpml.kmz import KmzError
 from avispria.core.wpml.lint import LintLimits, lint_kmz
 from avispria.core.wpml.reader import read_mission
@@ -35,7 +36,28 @@ def inspect(kmz: Annotated[Path, typer.Argument(exists=True, dir_okay=False)]) -
     if m.waypoints:
         heights = [w.height_m for w in m.waypoints]
         typer.echo(f"heights       {min(heights):g} .. {max(heights):g} m above takeoff")
-    typer.echo(f"speed         {m.auto_speed_ms:g} m/s")
+    speeds = sorted({w.speed_ms for w in m.waypoints})
+    if speeds:
+        typer.echo(
+            f"speeds        automatic {m.auto_speed_ms:g}, transit {m.transit_speed_ms:g}, "
+            f"waypoints {speeds[0]:g}" + (f" .. {speeds[-1]:g}" if len(speeds) > 1 else "") + " m/s"
+        )
+        route = route_length_m(m.waypoints)
+        seconds = route_seconds(m.waypoints, m.auto_speed_ms)
+        typer.echo(
+            f"route         {route:.0f} m between the waypoints; about {clock(seconds)} at those "
+            "speeds (DJI Fly shows the same on its map, without the climb and the way back)"
+        )
+        if (
+            len(speeds) > 1
+            or any(abs(s - m.auto_speed_ms) > 1e-6 for s in speeds)
+            or abs(m.transit_speed_ms - m.auto_speed_ms) > 1e-6
+        ):
+            typer.secho(
+                "NOTE: the speeds in this file are not all the same, so DJI Fly may fly it at a "
+                "different speed than planned.",
+                fg=typer.colors.YELLOW,
+            )
     typer.echo(f"on finish     {m.finish_action}   on signal lost: {m.rc_lost_action}")
 
 

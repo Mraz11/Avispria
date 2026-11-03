@@ -11,12 +11,23 @@ from avispria.app.ui.state import STATE
 
 FIELD_PAGE = "https://mraz11.github.io/Avispria/"
 BEFORE = (
-    "In DJI Fly, open each mission and compare its waypoints and heights with the spot-check "
+    "In DJI Fly, open each mission and compare what its map shows (waypoints, length, time) with "
+    "the 'DJI Fly should show' column on the Plan screen, and its heights with the spot-check "
     "sheet (the .csv next to each mission file). If they differ, do not fly it.",
     "Charge a battery for each mission, or for two or three short ones: the plan gives the "
     "minutes.",
     "The phone page has checklists, calculators and a flight log. It works without a signal "
     "once it has been opened (address below).",
+)
+DIFFERENT = (
+    "In DJI Fly open the mission's settings and read Global Speed. It should be the speed in the "
+    "plan.",
+    "To see what DJI Fly really holds, pull the mission back from the phone and inspect it. In a "
+    "terminal: avispria phone slots (lists the missions), then avispria phone pull <ID> --out "
+    "<a folder>, then avispria inspect <that file>.kmz. It prints the speeds, the route and the "
+    "time, and says so if the speeds in the file disagree.",
+    "If the numbers still differ, do not fly that mission, and send the output of inspect to the "
+    "developers.",
 )
 AT_THE_SITE = (
     "Check the rules where you fly, the wind and the GPS lock before you take off.",
@@ -54,5 +65,6 @@ async def fly_page() -> None:
             )
         _card("Before you leave", BEFORE, "fly-before")
         ui.link(FIELD_PAGE, FIELD_PAGE, new_tab=True).classes("text-sm")
+        _card("If DJI Fly shows different numbers", DIFFERENT, "fly-different")
         _card("At the site", AT_THE_SITE, "fly-site")
         _card("After landing", AFTER, "fly-after")

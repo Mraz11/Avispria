@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 from nicegui import ui
 
+from avispria.app.ui.progress import current_progress, step_done
+
 
 @dataclass(frozen=True)
 class Step:
@@ -87,6 +89,22 @@ def journey_bar(step: Step) -> None:
         with ui.row().classes("w-full items-center gap-3"):
             ui.badge(f"Step {step.number} of {TOTAL}").props("color=primary").mark("step-badge")
             ui.label(step.what).classes("text-sm font-medium")
+        progress = current_progress()
+        with ui.row().classes("gap-2 items-center").mark("journey-chips"):
+            for s in STEPS:
+                done, here = step_done(s.number, progress), s.number == step.number
+                icon = (
+                    "check_circle"
+                    if done
+                    else ("radio_button_checked" if here else "radio_button_unchecked")
+                )
+                ui.chip(
+                    nav_label(s),
+                    icon=icon,
+                    color="positive" if done else ("primary" if here else "grey-5"),
+                    text_color="white" if (done or here) else "black",
+                    on_click=lambda _, path=s.path: ui.navigate.to(path),
+                ).props("clickable dense").mark(f"chip-{s.number}")
         with ui.row().classes("gap-4"):
             before = STEPS[step.number - 2] if step.number > 1 else None
             after = STEPS[step.number] if step.number < TOTAL else None

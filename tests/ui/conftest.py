@@ -9,7 +9,9 @@ from avispria.core.feasibility import SystemSpec
 
 
 @pytest.fixture(autouse=True)
-def fresh_state() -> None:
+def fresh_state(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """Every test starts with nothing remembered and a settings file of its own."""
+    monkeypatch.setenv("AVISPRIA_SETTINGS", str(tmp_path / "settings-for-tests" / "settings.json"))
     state.reset()
 
 

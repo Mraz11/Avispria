@@ -13,17 +13,23 @@ from avispria.app.ui.charts import route_map
 from avispria.app.ui.files import open_in_file_manager
 from avispria.app.ui.plan_job import PlanJobResult
 from avispria.app.ui.views import Verdict, explain_issues
-from avispria.app.ui.views_results import plan_tiles, plan_verdict
+from avispria.app.ui.views_results import dji_fly_should_show, plan_tiles, plan_verdict
 from avispria.app.ui.widgets import echart, issue_cards, tile_row, verdict_banner
 from avispria.core.mission import Mission
 from avispria.core.safety import Issue
 
 FLY_FILE_HELP = (
     "On your phone, open DJI Fly, choose Waypoint Flight, add two points and save the mission "
-    "(do not fly it). Then open the Phone screen here and press 'Use as my sample mission', or "
-    "copy the .kmz file DJI Fly made for it to this computer by hand: "
+    "(do not fly it). Then connect the phone with the USB cable and press 'Get it from my phone' "
+    "above, or copy the .kmz file DJI Fly made for it to this computer by hand: "
     "Android/data/dji.go.v5/files/waypoint/<long ID>/<long ID>.kmz. Avispria copies the exact "
     "format your DJI Fly uses from this file."
+)
+
+COMPARE_HELP = (
+    "Open each mission in DJI Fly and compare: the waypoints, the length and the time at the "
+    "bottom of its map should match the last column (the time is the route divided by the speed, "
+    "not counting the climb and the way back). If they do not, do not fly it."
 )
 
 HOW_TO_FLY = (
@@ -90,6 +96,7 @@ def missions_section(
         {"name": "waypoints", "label": "Waypoints", "field": "waypoints"},
         {"name": "minutes", "label": "Flying time", "field": "minutes"},
         {"name": "height", "label": "Highest point above takeoff", "field": "height"},
+        {"name": "dji", "label": "DJI Fly should show", "field": "dji", "align": "left"},
     ]
     rows = [
         {
@@ -97,10 +104,12 @@ def missions_section(
             "waypoints": len(m.waypoints),
             "minutes": f"about {m.estimated_duration_s / 60:.0f} min",
             "height": f"{max(w.height_m for w in m.waypoints):.0f} m",
+            "dji": dji_fly_should_show(m),
         }
         for m, path in zip(missions, kmz_paths, strict=True)
     ]
     ui.table(columns=columns, rows=rows, row_key="file").classes("w-full")
+    ui.label(COMPARE_HELP).classes("text-sm av-muted").mark("compare-help")
     if warnings:
         ui.label("Notes about this plan").classes("text-lg font-bold")
         issue_cards(explain_issues(warnings))

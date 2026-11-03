@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from avispria.adapters.system_probe import EngineStatus
 from avispria.app.doctor import DoctorReport
 from avispria.app.ui.views import (
@@ -250,3 +252,65 @@ def test_a_3d_plan_shows_what_a_tilted_picture_gives_instead_of_a_prediction() -
     assert (
         "You will get" not in tiles and "Area coverage" not in tiles
     )  # no prediction for tilted photos
+
+
+def circle_mission(radius_m: float = 49.7):  # type: ignore[no-untyped-def]
+    """The mission a founder drew as a circle on the map: 2 cm/px, a photo at every waypoint."""
+    from avispria.adapters.profiles import load_profiles
+    from avispria.core.mission import PhotoMode
+    from avispria.core.plan_model import PlanRequest
+    from avispria.core.planner import plan
+    from avispria.core.safety import SafetyLimits
+    from avispria.core.shapes import DrawnShape, Role, build_area
+
+    lito = load_profiles()["lito-x1"]
+    area = build_area(
+        [DrawnShape(1, "circle", ((90.41, 23.73),), radius_m=radius_m, role=Role.INSIDE)]
+    )
+    polygon = area.pieces[0].polygon if hasattr(area.pieces[0], "polygon") else area.pieces[0]
+    result = plan(
+        PlanRequest(
+            aoi=polygon,
+            camera=lito.modes["12mp"],
+            drone_max_speed_ms=lito.max_speed_ms,
+            takeoff_lon=90.41,
+            takeoff_lat=23.73,
+            target_gsd_m=0.02,
+            front_overlap=0.8,
+            side_overlap=0.7,
+            photo_mode=PhotoMode.WAYPOINT,
+            flat_terrain=True,
+            limits=SafetyLimits(max_flight_time_s=1200.0),
+        )
+    )
+    return result.missions[0]
+
+
+def test_what_dji_fly_should_show_matches_a_real_mission_the_founder_flew_over_a_map() -> None:
+    from avispria.app.ui.views_results import dji_fly_should_show
+    from avispria.core.route import route_length_m
+
+    mission = circle_mission()
+    # DJI Fly showed 44 waypoints and 567 m for this circle; the leg labels on its map were
+    # 10, 12, 11, 24/25 and 41/42 m, which are this mission's legs
+    assert len(mission.waypoints) == 44 and route_length_m(mission.waypoints) == pytest.approx(
+        567.0, abs=2.0
+    )
+    assert dji_fly_should_show(mission) == "44 waypoints, 566 m, about 1:34 at 6.0 m/s"
+
+
+def test_a_mission_with_no_length_or_speed_never_divides_by_zero() -> None:
+    from dataclasses import replace
+
+    from avispria.app.ui.views_results import dji_fly_should_show
+    from avispria.core.route import route_length_m
+
+    mission = circle_mission()
+    one = replace(mission, waypoints=mission.waypoints[:1])
+    assert route_length_m(one.waypoints) == 0.0 and dji_fly_should_show(one).startswith(
+        "1 waypoints, 0 m, about 0:00"
+    )
+    stopped = replace(
+        mission, speed_ms=0.0, waypoints=tuple(replace(w, speed_ms=0.0) for w in mission.waypoints)
+    )
+    assert "about 0:00 at 0.0 m/s" in dji_fly_should_show(stopped)

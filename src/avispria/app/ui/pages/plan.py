@@ -49,6 +49,9 @@ async def plan_page() -> None:
         STATE.last_output = form.out_dir
         if outcome.value.outputs is not None:
             STATE.last_plan_files = [str(p) for p in outcome.value.outputs.kmz_paths]
+            STATE.last_sent_files = []  # a new plan has not been sent yet
+            if Path(form.template).is_file():
+                STATE.sample_mission = form.template  # the sample that worked is remembered
         shown = Path(form.out_dir).expanduser()
         if is_object:
             show_scan(results, outcome.value, shown)

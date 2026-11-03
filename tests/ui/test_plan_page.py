@@ -47,8 +47,8 @@ async def test_the_screen_asks_for_everything_in_plain_words(user: User) -> None
 async def test_the_steps_are_numbered_in_the_order_they_are_filled_in(user: User) -> None:
     await user.open("/plan")
     await user.should_see("1. What do you want to capture?")
-    await user.should_see("Open step 2: Send to DJI Fly")  # where the sample mission comes from
-    await user.should_see("Use as my sample mission")
+    await user.should_see("Get it from my phone")  # the sample mission, right here
+    await user.should_not_see("Open step 2")  # no trip to another screen for it
     titles = [
         "1. What do you want to capture?",
         "2. Where: the area",
@@ -136,6 +136,10 @@ async def test_planning_end_to_end_shows_prediction_route_and_missions(
     await user.should_see(kind=ui.echart)
     await user.should_see("Missions")
     await user.should_see("How do I get these missions onto my drone?")
+    await user.should_see("If they do not, do not fly it.")  # what to compare with on the phone
+    table = next(iter(user.find(kind=ui.table).elements))
+    assert [c["label"] for c in table.columns][-1] == "DJI Fly should show"
+    assert all("waypoints," in row["dji"] and " m, about " in row["dji"] for row in table.rows)
     await user.should_see("A photo is taken at every photo waypoint")  # the default now
     await user.should_not_see("set the camera to timed shot")
     await user.should_see("Planned without terrain data")  # SAF008, explained
@@ -264,3 +268,27 @@ async def test_the_form_explains_the_two_ways_of_taking_photos(user: User) -> No
         "waypoint",
         "A photo at every photo point (recommended)",
     )
+
+
+async def test_a_new_plan_is_not_yet_sent_and_its_sample_mission_is_remembered(
+    user: User, plan_form: PlanForm
+) -> None:
+    STATE.last_sent_files = ["old_plan.kmz"]  # an earlier plan that was sent
+    await user.open("/plan")
+    fill(user, plan_form)
+    user.find(marker="run").click()
+    await user.should_see("The route", retries=300)
+    assert STATE.last_sent_files == []  # the tracker must not call the new plan sent
+    assert STATE.sample_mission == plan_form.template  # no need to look for it next time
+    assert len(STATE.last_plan_files) >= 1
+
+
+async def test_a_plan_that_could_not_be_made_keeps_what_was_remembered(
+    user: User, plan_form: PlanForm
+) -> None:
+    STATE.last_sent_files = ["old_plan.kmz"]
+    STATE.last_plan_files = ["old_plan.kmz"]
+    await user.open("/plan")
+    user.find(marker="run").click()  # an empty form: nothing is planned
+    await user.should_see("Centre of the area", retries=100)
+    assert STATE.last_sent_files == ["old_plan.kmz"] and STATE.last_plan_files == ["old_plan.kmz"]

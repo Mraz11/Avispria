@@ -637,3 +637,44 @@ def test_a_tilt_that_is_too_steep_is_refused_by_the_command(aoi: Path, tmp_path:
     result = _plan(aoi, tmp_path / "x", "--flat", "--tilt", "70")
     assert result.exit_code == 1 and "too steep" in result.output
     assert not (tmp_path / "x").exists()
+
+
+def test_inspect_shows_the_route_and_the_time_dji_fly_shows(tmp_path: Path, aoi: Path) -> None:
+    out = tmp_path / "plan"
+    assert _plan(aoi, out, "--flat").exit_code == 0
+    first = sorted(out.glob("*.kmz"))[0]
+    shown = runner.invoke(app, ["inspect", str(first)]).output
+    import re
+
+    equal = re.search(r"speeds        automatic ([\d.]+), transit \1, waypoints \1 m/s", shown)
+    assert equal, shown  # the three speeds a mission carries are one and the same
+    assert " m between the waypoints; about " in shown and "DJI Fly shows the same" in shown
+    assert "NOTE" not in shown  # one speed everywhere: nothing to warn about
+
+
+def test_inspect_says_when_the_speeds_inside_a_file_disagree(tmp_path: Path) -> None:
+    import re
+    import zipfile
+
+    src = Path(__file__).resolve().parents[1] / "fixtures" / "dji_fly_poi" / "angles_6wp.kmz"
+    odd = tmp_path / "odd.kmz"
+    with zipfile.ZipFile(src) as zin, zipfile.ZipFile(odd, "w") as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename.endswith("waylines.wpml"):
+                data = re.sub(
+                    rb"<wpml:autoFlightSpeed>[^<]*</wpml:autoFlightSpeed>",
+                    b"<wpml:autoFlightSpeed>8.2</wpml:autoFlightSpeed>",
+                    data,
+                )
+            zout.writestr(item.filename, data)
+    shown = runner.invoke(app, ["inspect", str(odd)]).output
+    assert "automatic 8.2, transit 2.5, waypoints 2.5 m/s" in shown
+    assert "NOTE: the speeds in this file are not all the same" in shown
+
+
+def test_inspect_of_the_real_dji_fly_mission_matches_what_dji_fly_computes() -> None:
+    src = Path(__file__).resolve().parents[1] / "fixtures" / "dji_fly_poi" / "angles_6wp.kmz"
+    shown = runner.invoke(app, ["inspect", str(src)]).output
+    assert "speeds        automatic 2.5, transit 2.5, waypoints 2.5 m/s" in shown
+    assert "NOTE" not in shown

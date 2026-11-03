@@ -9,7 +9,9 @@ from pathlib import Path
 from typing import Any
 
 from avispria.app.ui.views import Tile, Verdict, pct
+from avispria.core.mission import Mission
 from avispria.core.plan_model import PlanResult
+from avispria.core.route import clock, route_length_m, route_seconds
 from avispria.core.safety import Issue
 
 SERIOUS_PLAN_CODES = {"PL001", "PL002", "SAF003", "SAF008", "SC002", "QA006", "QA010", "QA014"}
@@ -165,3 +167,10 @@ def key_outputs(provenance: Mapping[str, Any], out_dir: Path) -> list[tuple[str,
         if match is not None:
             found.append((label, out_dir / match))
     return found
+
+
+def dji_fly_should_show(mission: Mission) -> str:
+    """What DJI Fly's map should say for this mission, to compare before flying it."""
+    n, route = len(mission.waypoints), route_length_m(mission.waypoints)
+    seconds = route_seconds(mission.waypoints, mission.speed_ms)
+    return f"{n} waypoints, {route:.0f} m, about {clock(seconds)} at {mission.speed_ms:.1f} m/s"

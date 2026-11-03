@@ -13,16 +13,10 @@ from avispria.app.ui.pages.plan_object import ObjectCards
 from avispria.app.ui.pages.plan_results import FLY_FILE_HELP
 from avispria.app.ui.pages.plan_settings import AREA_KINDS, SettingsCards
 from avispria.app.ui.pages.plan_type import TypeCard
+from avispria.app.ui.pages.sample_panel import SamplePanel
 from avispria.app.ui.plan_job import PlanForm
 from avispria.app.ui.state import STATE
 from avispria.app.ui.widgets import PathField
-
-SAMPLE_HELP = (
-    "Avispria copies the exact format your DJI Fly uses from a sample mission. If you have none "
-    "yet: in DJI Fly make a Waypoint Flight with two points and save it (do not fly it), connect "
-    "the phone to this computer, open step 2 and press 'Use as my sample mission'. You do this "
-    "once."
-)
 
 
 class PlanFormUi(TypeCard, ObjectCards, SettingsCards):
@@ -118,8 +112,7 @@ class PlanFormUi(TypeCard, ObjectCards, SettingsCards):
             self.note = ui.label().classes("text-sm av-caution-text")
             self.aircraft.on_value_change(self._aircraft_changed)
             self._aircraft_changed()
-            ui.label(SAMPLE_HELP).classes("text-sm av-muted").mark("sample-help")
-            ui.link("Open step 2: Send to DJI Fly", "/phone").classes("text-sm")
+            self.sample_panel = SamplePanel(on_found=self._sample_found)
             self.template = PathField(
                 "Your DJI Fly sample mission (.kmz)",
                 directory=False,
@@ -129,6 +122,10 @@ class PlanFormUi(TypeCard, ObjectCards, SettingsCards):
             )
             with ui.expansion("How do I get this file?", icon="help_outline").classes("w-full"):
                 ui.label(FLY_FILE_HELP).classes("text-sm")
+
+    def _sample_found(self, path: str) -> None:
+        """The sample mission was taken from the phone: use it, no need to type its path."""
+        self.template.input.set_value(path)
 
     def _aircraft_changed(self) -> None:
         profile = self.profiles[self.aircraft.value]

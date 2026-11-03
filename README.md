@@ -143,8 +143,9 @@ Planning flights and checking photos work without it. To make maps, install **We
 
 ### The window interface (no terminal needed)
 
-A flight project has five steps; the window shows them in this order, with "Step n of 5" at the top of each
-screen and a button to the next step at the bottom.
+A flight project has a set-up (once) and five steps; the window shows them in this order, with "Step n of 5"
+and five progress chips at the top of each screen, a button to the next step at the bottom, and the one thing to
+do next on the Start page. See [the workflow](docs/field/workflow.md).
 
 Start it as described above. It has a Start screen, one screen for each of the five steps, and a
 light/dark switch in the top corner:

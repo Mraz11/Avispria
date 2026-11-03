@@ -13,6 +13,7 @@ from nicegui import ui
 from avispria.app.phone_workflow import SendError, default_backup_dir
 from avispria.app.ui.jobs import run_job
 from avispria.app.ui.layout import frame
+from avispria.app.ui.pages.phone_help import FIRST_TIME, INTRO, WIFI
 from avispria.app.ui.phone_job import (
     PhoneStatus,
     SendRequest,
@@ -23,35 +24,10 @@ from avispria.app.ui.phone_job import (
     send_all,
     use_as_sample,
 )
+from avispria.app.ui.readiness import readiness
 from avispria.app.ui.state import STATE
 from avispria.app.ui.views import phone_rows, slot_label
 from avispria.app.ui.widgets import PathField, status_rows
-
-INTRO = (
-    "DJI Fly cannot import mission files, and Android does not let any phone app write into it. "
-    "So Avispria does it from this computer: it replaces the mission in a placeholder 'slot' that "
-    "you made once in DJI Fly. The original is always copied here first."
-)
-FIRST_TIME = (
-    "1. In DJI Fly, open Waypoint and save a few placeholder missions (any two points each). "
-    "These are the slots a plan goes into.\n"
-    "2. On the phone: Settings > About phone, tap the OS version seven times to switch on "
-    "developer mode.\n"
-    "3. Settings > Additional settings > Developer options > switch on USB debugging "
-    "(on Xiaomi phones also 'USB debugging (Security settings)').\n"
-    "4. Plug the phone in, unlock it, and tap Allow on 'Allow USB debugging?' "
-    "(tick 'Always allow').\n"
-    "5. You also need adb, Google's small free debugging tool: download 'SDK Platform-Tools' from "
-    "developer.android.com/tools/releases/platform-tools, unzip it, and choose its folder below if "
-    "Avispria does not find it by itself.\n"
-    "Switch USB debugging off again when you are not using it."
-)
-WIFI = (
-    "No cable: on the phone open Developer options > Wireless debugging (phone and computer on "
-    "the same Wi-Fi, or the phone's hotspot). Tap 'Pair device with pairing code': type the "
-    "address and the 6 digits it shows here and press Pair (once). Then type the address shown "
-    "on the main Wireless debugging screen (it is a different number) and press Connect."
-)
 
 
 def _problem(box: ui.column, text: str) -> None:
@@ -74,9 +50,10 @@ async def phone_page() -> None:
 
     with frame("Send to DJI Fly"):
         ui.label(INTRO).classes("text-base")
+        ready_card = ui.card().classes("w-full gap-2").mark("phone-ready")
 
         with ui.card().classes("w-full gap-3"):
-            ui.label("1. Connect your phone").classes("text-lg font-bold")
+            ui.label("Is the phone connected?").classes("text-lg font-bold")
             state_box = ui.column().classes("w-full gap-2")
             check_button = (
                 ui.button("Check again", icon="refresh").props("no-caps").mark("phone-refresh")
@@ -129,7 +106,7 @@ async def phone_page() -> None:
         slots_card.clear()
         slots_card.set_visibility(bool(status["now"].slots))
         with slots_card:
-            ui.label("2. Your missions in DJI Fly").classes("text-lg font-bold")
+            ui.label("Placeholder missions in DJI Fly").classes("text-lg font-bold")
             ui.label(
                 "These are the slots a plan can be sent to. 'Use as my sample mission' copies one "
                 "to this computer, so planning matches your aircraft exactly."
@@ -178,7 +155,7 @@ async def phone_page() -> None:
         send_card.set_visibility(bool(status["now"].slots))
         rows.clear()
         with send_card:
-            ui.label("3. Send a plan to DJI Fly").classes("text-lg font-bold")
+            ui.label("Send the plan").classes("text-lg font-bold")
             w["rows"] = ui.column().classes("w-full gap-3")
             for path in STATE.last_plan_files or [""]:
                 add_row(path)
@@ -196,6 +173,20 @@ async def phone_page() -> None:
                 "no-caps color=primary"
             ).mark("send-button")
 
+    def show_readiness() -> None:
+        ready_card.clear()
+        with ready_card:
+            ui.label("Before you send").classes("text-lg font-bold")
+            for item in readiness(status["now"], STATE.last_plan_files):
+                with ui.row().classes("items-start gap-2 no-wrap"):
+                    ui.icon("check_circle" if item.ok else "error_outline").classes(
+                        "av-good-text" if item.ok else "av-problem-text"
+                    )
+                    with ui.column().classes("gap-0"):
+                        ui.label(item.text).classes("font-medium")
+                        if item.fix:
+                            ui.label(item.fix).classes("text-sm")
+
     async def check() -> None:
         STATE.adb_path = adb_field.value
         check_button.disable()
@@ -212,6 +203,7 @@ async def phone_page() -> None:
             else:
                 status["now"] = PhoneStatus()
                 ui.label(f"Could not check the phone: {result.error}").classes("av-problem-text")
+        show_readiness()
         slot_cards()
         send_panel()
         check_button.enable()
@@ -300,6 +292,7 @@ async def phone_page() -> None:
                 timeout=0,  # stays until dismissed: it must be read, wherever the page is scrolled
             )
             if done:
+                STATE.last_sent_files = [str(o.request.plan) for o in done]
                 with ui.card().classes("w-full av-note-caution"):
                     ui.label("Next, on the phone").classes("font-bold")
                     ui.label(

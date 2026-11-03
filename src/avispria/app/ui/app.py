@@ -15,6 +15,7 @@ from avispria.app.ui.pages.home import home_page
 from avispria.app.ui.pages.phone import phone_page
 from avispria.app.ui.pages.plan import plan_page
 from avispria.app.ui.pages.process import process_page
+from avispria.app.ui.state import STATE
 
 HOST = "127.0.0.1"  # this computer only: nothing is reachable from the network
 
@@ -43,6 +44,7 @@ def find_free_port(start: int, tries: int = 20) -> int:
 
 
 def run_app(port: int = 8080, open_browser: bool = True) -> None:
+    STATE.load()  # remember the sample mission, the phone settings and the last plan between runs
     register_pages()
     ui.run(
         host=HOST,

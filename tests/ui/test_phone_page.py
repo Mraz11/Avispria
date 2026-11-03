@@ -35,13 +35,13 @@ async def test_the_screen_shows_the_phone_and_the_missions_dji_fly_holds(
     user: User, fake_phone
 ) -> None:  # type: ignore[no-untyped-def]
     await user.open("/phone")
-    await user.should_see("1. Connect your phone")
+    await user.should_see("Is the phone connected?")
     await user.should_see("Redmi K90 is connected (USB)", retries=100)
     await user.should_see("2 missions found")
-    await user.should_see("2. Your missions in DJI Fly")
+    await user.should_see("Placeholder missions in DJI Fly")
     await user.should_see("Mission 59B88CA7...")
     await user.should_see("Use as my sample mission")
-    await user.should_see("3. Send a plan to DJI Fly")
+    await user.should_see("Send the plan")
 
 
 async def test_without_adb_the_screen_says_where_to_get_it(user: User, monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -52,7 +52,7 @@ async def test_without_adb_the_screen_says_where_to_get_it(user: User, monkeypat
     await user.open("/phone")
     await user.should_see("Debugging tool (adb): Not found", retries=100)
     await user.should_see("Platform-Tools")
-    await user.should_not_see("2. Your missions in DJI Fly")  # nothing to choose from yet
+    await user.should_not_see("Placeholder missions in DJI Fly")  # nothing to choose from yet
     user.find(marker="adb-input")  # and a place to say where it is
 
 
@@ -155,13 +155,13 @@ async def test_a_whole_plan_goes_from_planning_to_the_phone(
     await user.should_see("Send to DJI Fly...")
     assert STATE.last_plan_files and all(p.endswith(".kmz") for p in STATE.last_plan_files)
     user.find(marker="to-phone").click()
-    await user.should_see("3. Send a plan to DJI Fly", retries=100)
+    await user.should_see("Send the plan", retries=100)
     assert value_of(user, "send-file-0-input") == STATE.last_plan_files[0]  # already filled in
 
 
 async def test_wifi_pairing_from_the_screen(user: User, fake_phone) -> None:  # type: ignore[no-untyped-def]
     await user.open("/phone")
-    await user.should_see("1. Connect your phone")
+    await user.should_see("Is the phone connected?")
     set_text(user, "pair-address-input", "192.168.1.5:37123")
     set_text(user, "pair-code-input", "123456")
     user.find(marker="pair-button").click()
@@ -184,3 +184,60 @@ async def test_a_mission_that_cannot_be_read_is_shown_but_never_offered(
     await user.should_not_see(marker="use-AAAAAAAA")  # no sample button for it
     options = next(iter(user.find(marker="send-slot-0").elements)).options
     assert junk not in options and fake_phone.ids[0] in options  # and not in the slot list
+
+
+async def test_the_page_says_what_is_needed_before_sending_and_what_is_in_place(
+    user: User, fake_phone, tmp_path: Path
+) -> None:  # type: ignore[no-untyped-def]
+    STATE.last_plan_files = [str(tmp_path / "survey_01.kmz"), str(tmp_path / "survey_02.kmz")]
+    await user.open("/phone")
+    await user.should_see("Before you send", retries=100)
+    await user.should_see("Your last plan has 2 missions to send.")
+    await user.should_see("Phone connected: Redmi K90.")
+    await user.should_see("DJI Fly has 2 missions that can be replaced: enough for your plan.")
+    await user.should_not_see("Make 1 more")
+
+
+async def test_too_few_placeholder_missions_says_how_many_more_to_make_before_anything_is_sent(
+    user: User, fake_phone, tmp_path: Path
+) -> None:  # type: ignore[no-untyped-def]
+    STATE.last_plan_files = [str(tmp_path / f"survey_0{n}.kmz") for n in (1, 2, 3)]
+    await user.open("/phone")
+    await user.should_see(
+        "DJI Fly has 2 missions that can be replaced, but your plan has 3.", retries=100
+    )
+    await user.should_see("Make 1 more.")
+    await user.should_see("Waypoint Flight, add any two points and press Save")
+    await user.should_see("Then press Check again.")
+
+
+async def test_a_missing_plan_points_back_to_step_one(user: User, fake_phone) -> None:  # type: ignore[no-untyped-def]
+    await user.open("/phone")
+    await user.should_see("There is no plan to send yet.", retries=100)
+    await user.should_see("Make one in step 1 (Plan a flight)")
+
+
+async def test_no_phone_is_the_first_thing_the_checklist_says(
+    user: User, fake_phone, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv("FAKE_ADB_STATE", "none")
+    STATE.last_plan_files = [str(tmp_path / "survey_01.kmz")]
+    await user.open("/phone")
+    await user.should_see("Before you send", retries=100)
+    await user.should_see("No phone is connected.")
+    await user.should_see("Your last plan has 1 mission to send.")
+    await user.should_not_see("can be replaced")
+
+
+async def test_a_successful_send_is_remembered_for_the_progress_tracker(
+    user: User, fake_phone, tmp_path: Path
+) -> None:  # type: ignore[no-untyped-def]
+    plan = my_plan(tmp_path, fake_phone.sample)
+    assert STATE.last_sent_files == []
+    await user.open("/phone")
+    await user.should_see("Mission 59B88CA7...", retries=100)
+    set_text(user, "send-file-0-input", str(plan))
+    user.find(marker="confirm-send").click()
+    user.find(marker="send-button").click()
+    await user.should_see("Sent survey_01.kmz to 59B88CA7", retries=100)
+    assert STATE.last_sent_files == [str(plan)]

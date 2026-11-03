@@ -10,10 +10,12 @@ import pytest
 from avispria.adapters.adb import Adb, AdbNotFound
 from avispria.app.phone_workflow import WAYPOINT_DIR, SendError, kmz_path
 from avispria.app.ui.phone_job import (
+    NO_MISSION_YET,
     SendRequest,
     check_phone,
     check_requests,
     connect_phone,
+    fetch_sample,
     pair_phone,
     send_all,
     use_as_sample,
@@ -170,3 +172,60 @@ def test_a_mission_avispria_cannot_read_is_never_a_slot(phone: Path, tmp_path: P
     with pytest.raises(SendError, match="cannot read mission AAAAAAAA"):
         check_requests([SendRequest(plan, junk)], slots)
     check_requests([SendRequest(plan, A)], slots)  # a readable one is still fine
+
+
+THREE = Path(__file__).resolve().parents[1] / "fixtures" / "dji_fly_poi" / "custom_3wp.kmz"
+C = "0A1B2C3D-0000-4000-8000-00000000000C"
+
+
+def test_the_sample_mission_is_taken_from_the_phone_in_one_step(
+    phone: Path, tmp_path: Path
+) -> None:
+    got = fetch_sample(folder=tmp_path / "samples")
+    assert got.parent == tmp_path / "samples" and got.suffix == ".kmz"
+    assert got.read_bytes() == SAMPLE.read_bytes()  # a copy of a DJI Fly mission, untouched
+
+
+def test_the_plainest_mission_is_chosen_not_the_biggest_or_a_plan_sent_earlier(
+    phone: Path, tmp_path: Path
+) -> None:
+    base = phone / WAYPOINT_DIR.lstrip("/")
+    (base / C).mkdir()
+    (base / C / f"{C}.kmz").write_bytes(
+        THREE.read_bytes()
+    )  # 3 waypoints: fewer than the 5 of A and B
+    got = fetch_sample(folder=tmp_path / "samples")
+    assert got.name == f"{C}.kmz" and got.read_bytes() == THREE.read_bytes()
+
+
+def test_equal_missions_are_chosen_by_name_so_the_choice_never_wobbles(
+    phone: Path, tmp_path: Path
+) -> None:
+    assert (
+        fetch_sample(folder=tmp_path / "a").name
+        == f"{A}.kmz"
+        == fetch_sample(folder=tmp_path / "b").name
+    )
+
+
+def test_no_phone_is_said_in_plain_words(
+    phone: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("FAKE_ADB_STATE", "none")
+    with pytest.raises(SendError, match="No phone is connected"):
+        fetch_sample(folder=tmp_path / "s")
+    monkeypatch.setenv("FAKE_ADB_STATE", "unauthorized")
+    with pytest.raises(SendError, match="Allow"):
+        fetch_sample(folder=tmp_path / "s")
+    assert not (tmp_path / "s").exists()
+
+
+def test_a_phone_with_no_waypoint_mission_yet_is_told_how_to_make_one(
+    phone: Path, tmp_path: Path
+) -> None:
+    base = phone / WAYPOINT_DIR.lstrip("/")
+    for guid in (A, B):
+        (base / guid / f"{guid}.kmz").write_bytes(b"not a mission")  # cannot be read: 0 waypoints
+    with pytest.raises(SendError) as caught:
+        fetch_sample(folder=tmp_path / "s")
+    assert str(caught.value) == NO_MISSION_YET and "Waypoint Flight" in NO_MISSION_YET

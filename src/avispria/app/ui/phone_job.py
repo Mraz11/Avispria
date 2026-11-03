@@ -147,3 +147,27 @@ def send_all(
             break
         outcomes.append(SendOutcome(request, result=result))
     return outcomes
+
+
+NO_MISSION_YET = (
+    "DJI Fly on the phone has no waypoint mission yet. In DJI Fly choose Waypoint Flight, add two "
+    "points and press Save (do not fly it), then try again."
+)
+
+
+def fetch_sample(
+    adb_path: str = "", folder: Path | None = None, backup_dir: Path | None = None
+) -> Path:
+    """Copy a mission from the phone to this computer, to be the sample for planning.
+
+    The one with the fewest waypoints is taken: a plain placeholder, not a plan sent earlier. The
+    phone must be connected; otherwise the reason is said in plain words.
+    """
+    status = check_phone(adb_path, backup_dir)
+    if status.serial is None:
+        raise SendError(status.problem or "No phone is connected.")
+    usable = [s for s in status.slots if s.waypoints > 0]
+    if not usable:
+        raise SendError(NO_MISSION_YET)
+    best = min(usable, key=lambda s: (s.waypoints, s.guid))
+    return use_as_sample(adb_path, status.serial, best.guid, folder)

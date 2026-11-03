@@ -162,6 +162,19 @@
   the SC prefix. NOT VERIFIED IN A REAL BROWSER: the whole new Plan layout (chooser, per-kind cards, pin map), the Fly
   screen. NOT FLOWN: tilted 3D missions, waypoint-per-photo missions, rings. Next ideas: a 3D preset in Make maps; a
   route chart for object plans; plan_map.py is 346 lines (hard limit 400).
+  SECOND ROUND OF FEEDBACK (2026-11-03, patch 0038): founder sent a Plan screenshot ('go to step 2, come back, go again')
+  and a DJI Fly screenshot (44 waypoints, 567 m, 1:09, black fan-shaped bands). ANALYSIS: the mission is a CIRCLE ~100 m
+  across (R 49.7 m, 2 cm/px, a photo at every waypoint): reproduced exactly (44 waypoints, 566 m, leg lengths 10/12/11/25/41 =
+  the 'D' labels), so the file is right; the short first/last rows and diagonal links are what a circle gives. OPEN: DJI Fly
+  shows 1:09 = 8.2 m/s but the file says 6.0 m/s everywhere (autoFlightSpeed, globalTransitionalSpeed, waypointSpeed) and
+  the planned time is 1:34; unexplained, asked the founder for DJI Fly's Global Speed. The black bands are probably DJI
+  Fly's 3D altitude display (UNVERIFIED). WORKFLOW FIXES: state persists in ~/Avispria/settings.json (paths only; STATE.load()
+  at start-up; tests set AVISPRIA_SETTINGS); the sample mission is fetched on the Plan screen and Start page
+  (pages/sample_panel.py, phone_job.fetch_sample: the mission with fewest waypoints); Send screen has a readiness
+  checklist (ui/readiness.py: how many placeholder missions are missing); ui/progress.py = what is done and the next action,
+  shown on Start and as chips on every step; a new plan clears last_sent_files; missions table has 'DJI Fly should show'
+  (core/route.py: leg length, time per waypoint speed, clock); `avispria inspect` prints the three speeds, route, time and a
+  NOTE when speeds disagree. docs/field/workflow.md is the pipeline in one page.
   OBJECT SCAN (built 2026-11-02, patch 0032; no flight yet): `avispria scan` (core/scan.py, app/scan_workflow.py,
   docs/field/object-scan.md). Object = upright cylinder; rings at radius+standoff; ring HEIGHTS follow from the heights on
   the surface each ring must be centred on (even, overlapping, base..top) and the tilt schedule (+10 up at the bottom,

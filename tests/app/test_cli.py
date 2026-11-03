@@ -607,3 +607,33 @@ def test_prepare_copy_can_make_a_brand_new_mission_id(tmp_path: Path) -> None:
     assert (
         again.exit_code == 0 and len([p for p in tmp_path.iterdir() if p.is_dir()]) == 2
     )  # a new one each time
+
+
+def test_a_tilted_plan_with_crossing_lines_is_a_3d_plan_and_says_so(
+    aoi: Path, tmp_path: Path
+) -> None:
+    from avispria.core.wpml.reader import read_mission
+
+    out = tmp_path / "t"
+    result = _plan(aoi, out, "--flat", "--tilt", "30", "--crosshatch")
+    assert result.exit_code == 0, result.output
+    assert "3D plan: camera tilted 30 degrees from straight down" in result.output
+    assert (
+        "cm/px at the bottom of a picture" in result.output
+        and "no prediction is made" in result.output
+    )
+    mission = sorted(out.glob("*.kmz"))[0]
+    pitches = {
+        w.gimbal_pitch_deg
+        for p in sorted(out.glob("*.kmz"))
+        for w in read_mission(p.read_bytes()).waypoints
+    }
+    assert pitches == {-60.0}  # the tilt reaches every waypoint of the written files
+    flat = _plan(aoi, tmp_path / "f", "--flat")
+    assert "3D plan" not in flat.output and mission.exists()
+
+
+def test_a_tilt_that_is_too_steep_is_refused_by_the_command(aoi: Path, tmp_path: Path) -> None:
+    result = _plan(aoi, tmp_path / "x", "--flat", "--tilt", "70")
+    assert result.exit_code == 1 and "too steep" in result.output
+    assert not (tmp_path / "x").exists()

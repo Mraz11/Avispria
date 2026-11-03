@@ -215,3 +215,38 @@ def test_the_engine_row_tells_three_situations_apart() -> None:
     assert "administrator" in hidden.hint and "wait until its dashboard opens" in hidden.hint
     up = {r.label: r for r in system_rows(doctor(engine=True))}["Map-making engine"]
     assert up.level == "good" and up.value == "WebODM is running"
+
+
+def test_a_3d_plan_shows_what_a_tilted_picture_gives_instead_of_a_prediction() -> None:
+    from avispria.adapters.profiles import load_profiles
+    from avispria.app.ui.views_results import plan_tiles
+    from avispria.core.geometry import rectangle_polygon
+    from avispria.core.mission import PhotoMode
+    from avispria.core.plan_model import PlanRequest
+    from avispria.core.planner import plan
+
+    lito = load_profiles()["lito-x1"]
+    aoi = rectangle_polygon(51.4769, -0.0015, 120.0, 120.0, 0.0)
+    result = plan(
+        PlanRequest(
+            aoi=aoi,
+            camera=lito.modes["12mp"],
+            drone_max_speed_ms=lito.max_speed_ms,
+            takeoff_lon=aoi.centroid.x,
+            takeoff_lat=aoi.centroid.y,
+            target_gsd_m=0.025,
+            gimbal_pitch_deg=-60.0,
+            crosshatch=True,
+            photo_mode=PhotoMode.WAYPOINT,
+            flat_terrain=True,
+        )
+    )
+    tiles = {t.label: t for t in plan_tiles(result)}
+    assert (
+        "30 degrees" in tiles["You asked for"].hint
+        and "2.50 cm/px at the centre" in tiles["You asked for"].value
+    )
+    assert "Resolution across a picture" in tiles and "One picture covers" in tiles
+    assert (
+        "You will get" not in tiles and "Area coverage" not in tiles
+    )  # no prediction for tilted photos

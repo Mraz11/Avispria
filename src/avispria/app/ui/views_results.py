@@ -65,6 +65,25 @@ def plan_tiles(result: PlanResult) -> list[Tile]:
                 f"{p.area_pct_good_views:.0f}% by 5+ photos",
             ),
         ]
+    v = s.oblique
+    if v is not None:
+        tiles[0] = Tile(
+            "You asked for",
+            f"{s.gsd_m * 100:.2f} cm/px at the centre",
+            f"camera tilted {s.tilt_deg:g} degrees, flying {s.agl_m:.0f} m above the surface",
+        )
+        tiles += [
+            Tile(
+                "Resolution across a picture",
+                f"{v.gsd_near_m * 100:.2f} to {v.gsd_far_m * 100:.2f} cm/px",
+                "finest at the bottom of a picture, coarsest at the top",
+            ),
+            Tile(
+                "One picture covers",
+                f"{v.along_m:.0f} m along, {v.across_near_m:.0f} to {v.across_far_m:.0f} m wide",
+                "on flat ground; overlap is counted along it and across its centre",
+            ),
+        ]
     n = len(result.missions)
     tiles.append(
         Tile(

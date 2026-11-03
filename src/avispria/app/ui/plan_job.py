@@ -40,6 +40,20 @@ class PlanForm:
     aoi_file: str = ""
     drawn_area_geojson: str = ""  # the area drawn on the map: a GeoJSON polygon (may have holes)
     drawn_area_problem: str = ""  # why there is none, in the map's own words
+    # which kind of scan: "flat", "area_3d" or "object_3d" (see core/scan_types.py)
+    scan_type: str = "flat"
+    # the object of a 3D model of one object
+    object_centre: str = ""  # latitude, longitude of its axis
+    object_height_m: float = 15.0
+    object_radius_m: float = 5.0
+    standoff_m: float = 14.0
+    base_height_m: float = 0.0
+    look_up_deg: float = 10.0
+    look_down_deg: float = 20.0
+    top_cap: bool = True
+    hover_s: float = 1.0
+    scan_speed_ms: float = 3.0
+    ground_offset_m: float = 0.0
     takeoff: str = ""  # empty: the centre of the area
     # aircraft
     aircraft: str = "lito-x1"
@@ -67,6 +81,7 @@ class PlanForm:
     max_distance_m: float = 500.0
     battery_minutes: float = 20.0
     crosshatch: bool = False
+    tilt_deg: float = 0.0  # camera tilt from straight down (0 = a flat map)
     heading_text: str = ""  # empty: automatic
     calibrate: bool = True
     straight_legs: bool = True
@@ -191,6 +206,7 @@ def build_inputs(form: PlanForm, profiles: dict[str, DroneProfile] | None = None
         side_overlap=form.side_percent / 100.0,
         heading_deg=heading,
         crosshatch=form.crosshatch,
+        tilt_deg=form.tilt_deg,
         photo_mode=PhotoMode.INTERVAL if form.photo_mode == "interval" else PhotoMode.WAYPOINT,
         dem_path=dem_path,
         flat_terrain=form.terrain != "model",

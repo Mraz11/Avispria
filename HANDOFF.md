@@ -139,6 +139,19 @@
   plan_map_text.py (labels, colours, help texts). Tests patch plan_map_places.search_places and read LOCATION_JS there.
   UNVERIFIED in a real browser: the numbered tooltips (bindTooltip on circleMarker), the corner discs, clicks while a
   draw tool is active (draw:drawstart ends editing), live Nominatim answers, real browser location.
+  FOUNDER'S FIRST REAL USE (2026-11-02): planned a map on the PC, sent it, it opened in DJI Fly (no flight yet).
+  Three complaints: (1) waypoints only at line ends, wanted one at every photo point; (2) no separate 3D vs flat
+  scanning with their own settings; (3) steps not in order / no direction. DONE: (1) PhotoMode.WAYPOINT was already
+  implemented; the UI/CLI defaulted to interval. Now the default everywhere; AVI001 only for aircraft whose profile lacks
+  photo_action_verified (Lito X1 has it); waypoint mode = more missions (200x300 m @2 cm: 3 x 84 waypoints, not 1 x 18):
+  results say how many slots are needed. (2) ENGINE: core/camera.oblique_view (verified against independent ray casting in
+  tests/raycast.py), planner tilt (spacing from the tilted footprint, overrun = near_ahead + 2 photo spacings, shutter limit
+  from the finest along-track GSD, resolution asked = at the picture centre), PlanOptions/CLI --tilt, results tiles;
+  core/scan_types.py (flat / area_3d / object_3d with recommended settings); app/ui/scan_job.py (object scan from the
+  form). A coverage simulation (every photo footprint cast onto flat ground) shows every point seen by >= 9 photos in a
+  30-degree crosshatch plan. TODO: (2) the SCREEN (scan-type chooser on Plan a flight, per-type fields, object card with a
+  map pin, object results view) and (3) the guided order (nav Plan > Send > Fly > Check > Make maps, numbered journey on the
+  Start page, 'step n of 5' lines, Next-step buttons). plan_form.py is 332 lines (hard limit 400): split before adding.
   OBJECT SCAN (built 2026-11-02, patch 0032; no flight yet): `avispria scan` (core/scan.py, app/scan_workflow.py,
   docs/field/object-scan.md). Object = upright cylinder; rings at radius+standoff; ring HEIGHTS follow from the heights on
   the surface each ring must be centred on (even, overlapping, base..top) and the tilt schedule (+10 up at the bottom,

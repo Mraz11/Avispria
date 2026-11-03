@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 from shapely.geometry import Polygon
 
-from avispria.core.camera import CameraProfile
+from avispria.core.camera import CameraProfile, ObliqueView
 from avispria.core.mission import Mission, PhotoMode
 from avispria.core.predict import PlanPrediction
 from avispria.core.profile import TerrainOptions
@@ -64,6 +64,8 @@ class PlanSummary:
     spacing_height_m: float = 0.0  # height the photo and line spacing are computed for
     calibration_steps: int = 1  # planning passes it took
     prediction: PlanPrediction | None = None  # what the plan will achieve over the real surface
+    tilt_deg: float = 0.0  # camera tilt from straight down (0 = a flat-map plan)
+    oblique: ObliqueView | None = None  # what one tilted picture covers, for a tilted plan
 
 
 @dataclass(frozen=True)

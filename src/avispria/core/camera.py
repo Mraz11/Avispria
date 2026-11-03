@@ -122,3 +122,86 @@ def sensor_size_from_exif(
     diagonal_mm = DIAGONAL_35MM_MM * focal_mm / focal_35mm_mm
     diagonal_px = math.hypot(width_px, height_px)
     return diagonal_mm * width_px / diagonal_px, diagonal_mm * height_px / diagonal_px
+
+
+# ------------------------------------------------------------ a camera tilted off straight down
+MAX_RAY_DEG = 80.0  # the picture's farthest ray may not be steeper than this from straight down
+OBLIQUE_MIN_DEG = 1.0  # less tilt than this is treated as straight down
+
+
+@dataclass(frozen=True)
+class ObliqueView:
+    """What a camera tilted ``tilt_deg`` from straight down (looking ahead, along the flight) sees
+    over flat ground from ``agl_m`` above it. Distances are along the ground, from the point
+    directly below the aircraft; 'near' is the bottom edge of the picture, 'far' the top."""
+
+    tilt_deg: float
+    agl_m: float
+    near_ahead_m: float  # where the near edge lands (negative: behind the aircraft)
+    far_ahead_m: float
+    across_near_m: float  # the picture's width at its near edge, at its centre, at its far edge
+    across_centre_m: float
+    across_far_m: float
+    gsd_near_m: float  # metres per pixel across the track, at those same three places
+    gsd_centre_m: float
+    gsd_far_m: float
+    gsd_along_near_m: float  # metres per pixel ALONG the track at the near edge: the finest, so
+    # the one that decides how much motion blur a shutter speed gives
+
+    @property
+    def along_m(self) -> float:
+        """Ground length of one picture along the flight direction."""
+        return self.far_ahead_m - self.near_ahead_m
+
+
+def oblique_view(cam: CameraProfile, agl_m: float, tilt_deg: float) -> ObliqueView:
+    """The footprint of one picture from a camera tilted ``tilt_deg`` from straight down.
+
+    Raises ValueError when the tilt is so steep that the top of the picture would look near the
+    horizon (the ground there is stretched out of all use).
+    """
+    _check_height(agl_m)
+    if not (math.isfinite(tilt_deg) and 0.0 <= tilt_deg < 90.0):
+        raise ValueError(
+            f"tilt must be between 0 and 90 degrees from straight down, got {tilt_deg!r}"
+        )
+    half = math.atan(
+        (cam.image_height_px / 2.0) / cam.focal_px
+    )  # half the picture's height, as an angle
+    theta = math.radians(tilt_deg)
+    if math.degrees(theta + half) > MAX_RAY_DEG:
+        worst = MAX_RAY_DEG - math.degrees(half)
+        raise ValueError(
+            f"a tilt of {tilt_deg:g} degrees is too steep: the top of the picture would look more "
+            f"than {MAX_RAY_DEG:g} degrees from straight down; use at most {worst:.0f} degrees"
+        )
+
+    def across_gsd(offset: float) -> float:
+        ray = theta + offset
+        return agl_m * math.cos(offset) / (cam.focal_px * math.cos(ray))
+
+    def along_gsd(offset: float) -> float:
+        ray = theta + offset
+        return agl_m * math.cos(offset) ** 2 / (cam.focal_px * math.cos(ray) ** 2)
+
+    width = float(cam.image_width_px)
+    return ObliqueView(
+        tilt_deg=tilt_deg,
+        agl_m=agl_m,
+        near_ahead_m=agl_m * math.tan(theta - half),
+        far_ahead_m=agl_m * math.tan(theta + half),
+        across_near_m=across_gsd(-half) * width,
+        across_centre_m=across_gsd(0.0) * width,
+        across_far_m=across_gsd(half) * width,
+        gsd_near_m=across_gsd(-half),
+        gsd_centre_m=across_gsd(0.0),
+        gsd_far_m=across_gsd(half),
+        gsd_along_near_m=along_gsd(-half),
+    )
+
+
+def altitude_for_oblique_gsd(cam: CameraProfile, target_gsd_m: float, tilt_deg: float) -> float:
+    """Height above the surface that gives ``target_gsd_m`` at the CENTRE of a tilted picture."""
+    if not (math.isfinite(target_gsd_m) and target_gsd_m > 0):
+        raise ValueError(f"target GSD must be positive, got {target_gsd_m!r}")
+    return target_gsd_m * cam.focal_px * math.cos(math.radians(tilt_deg))

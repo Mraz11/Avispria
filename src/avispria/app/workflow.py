@@ -45,6 +45,7 @@ class PlanOptions:
     side_overlap: float = 0.7
     heading_deg: float | None = None
     crosshatch: bool = False
+    tilt_deg: float = 0.0  # camera tilt from straight down: 0 = a flat map, about 30 = a 3D model
     photo_mode: PhotoMode = PhotoMode.WAYPOINT  # a waypoint at every photo point
     dem_path: Path | None = None
     flat_terrain: bool = False
@@ -148,6 +149,7 @@ def run_plan(
             side_overlap=opts.side_overlap,
             heading_deg=opts.heading_deg,
             crosshatch=opts.crosshatch,
+            gimbal_pitch_deg=-(90.0 - opts.tilt_deg),
             photo_mode=opts.photo_mode,
             dem=dem,
             flat_terrain=opts.flat_terrain,

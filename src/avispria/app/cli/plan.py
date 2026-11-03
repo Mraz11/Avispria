@@ -43,7 +43,16 @@ def plan(
     front: float = 0.8,
     side: float = 0.7,
     heading: Annotated[float | None, typer.Option(help="Line heading (deg); default auto")] = None,
-    crosshatch: bool = False,
+    crosshatch: Annotated[
+        bool, typer.Option(help="Fly a second set of lines across the first (for 3D models)")
+    ] = False,
+    tilt: Annotated[
+        float,
+        typer.Option(
+            help="Camera tilt from straight down in degrees: 0 = a flat map, about 30 = a 3D "
+            "model of an area (use --crosshatch with it)"
+        ),
+    ] = 0.0,
     photo_mode: Annotated[
         PhotoMode,
         typer.Option(
@@ -91,6 +100,7 @@ def plan(
         side_overlap=side,
         heading_deg=heading,
         crosshatch=crosshatch,
+        tilt_deg=tilt,
         photo_mode=photo_mode,
         dem_path=dem,
         flat_terrain=flat,
@@ -157,6 +167,22 @@ def _percent(value: float | None) -> str:
 def _print_prediction(s: PlanSummary) -> None:
     """What the plan will really achieve over the terrain, in plain words."""
     p = s.prediction
+    v = s.oblique
+    if v is not None:
+        typer.secho(
+            f"  3D plan: camera tilted {s.tilt_deg:g} degrees from straight down", bold=True
+        )
+        typer.echo(
+            f"    resolution                {v.gsd_near_m * 100:.2f} cm/px at the bottom of a "
+            f"picture, {v.gsd_centre_m * 100:.2f} at its centre, {v.gsd_far_m * 100:.2f} at the top"
+        )
+        typer.echo(
+            f"    one picture covers        {v.along_m:.0f} m along the flight, "
+            f"{v.across_near_m:.0f} to {v.across_far_m:.0f} m wide"
+        )
+        typer.echo(
+            "    no prediction is made for tilted photos: after the flight, use Check my photos"
+        )
     if p is None:
         return
     typer.secho(f"  Predicted over the real surface ({p.photos} photos):", bold=True)

@@ -11,7 +11,15 @@ from dataclasses import replace
 import numpy as np
 from numpy.typing import NDArray
 
-from avispria.core.camera import altitude_for_gsd, gsd_m, spacing_m
+from avispria.core.camera import (
+    OBLIQUE_MIN_DEG,
+    Spacing,
+    altitude_for_gsd,
+    altitude_for_oblique_gsd,
+    gsd_m,
+    oblique_view,
+    spacing_m,
+)
 from avispria.core.errors import PlanningError
 from avispria.core.geometry import LocalFrame
 from avispria.core.grid import auto_heading, lawnmower
@@ -43,6 +51,9 @@ def _validate(req: PlanRequest) -> float:
     if req.surface_height_m < 0:
         raise PlanningError("surface_height_m must not be negative")
     if req.target_gsd_m is not None:
+        tilt = 90.0 + req.gimbal_pitch_deg
+        if tilt > OBLIQUE_MIN_DEG:  # the resolution asked for is at the centre of a tilted picture
+            return altitude_for_oblique_gsd(req.camera, req.target_gsd_m, tilt)
         return altitude_for_gsd(req.camera, req.target_gsd_m)
     assert req.agl_m is not None
     if req.agl_m <= 0:
@@ -144,17 +155,34 @@ def _plan(req: PlanRequest, target_m: float, reference_m: float, spacing_m_: flo
     cam = req.camera
     frame = LocalFrame.for_polygon(req.aoi)
     area = frame.polygon_to_local(req.aoi)
-    sp = spacing_m(cam, spacing_m_, req.front_overlap, req.side_overlap)
+    tilt = 90.0 + req.gimbal_pitch_deg  # degrees from straight down
+    view = oblique_view(cam, spacing_m_, tilt) if tilt > OBLIQUE_MIN_DEG else None
+    if view is None:
+        sp = spacing_m(cam, spacing_m_, req.front_overlap, req.side_overlap)
+        default_overrun = sp.photo_m
+    else:
+        # a tilted picture is longer on the ground; overlap is measured along it and, between the
+        # lines, at its centre. It also lands AHEAD of the aircraft, so a line must start earlier to
+        # photograph the edge of the area (three photos at least, as in a flat-map plan).
+        sp = Spacing(
+            photo_m=view.along_m * (1.0 - req.front_overlap),
+            line_m=view.across_centre_m * (1.0 - req.side_overlap),
+        )
+        default_overrun = max(view.near_ahead_m, 0.0) + 2.0 * sp.photo_m
     heading = auto_heading(area) if req.heading_deg is None else req.heading_deg % 360.0
-    overrun = sp.photo_m if req.overrun_m is None else req.overrun_m
+    overrun = default_overrun if req.overrun_m is None else req.overrun_m
     strips = lawnmower(area, heading, sp.line_m, overrun)
     if req.crosshatch:
         strips += lawnmower(area, heading + 90.0, sp.line_m, overrun)
     if not strips:
         raise PlanningError("the area is too small to fit a survey line")
 
-    ground_sample = gsd_m(cam, target_m)
-    speed_gsd = gsd_m(cam, spacing_m_)  # the lowest photos set the motion-blur limit
+    if view is None:
+        ground_sample = gsd_m(cam, target_m)
+        speed_gsd = gsd_m(cam, spacing_m_)  # the lowest photos set the motion-blur limit
+    else:  # the centre of the picture; blur is worst where the ground is finest, at the near edge
+        ground_sample = oblique_view(cam, target_m, tilt).gsd_centre_m
+        speed_gsd = view.gsd_along_near_m
     speed = solve_speed(
         cam, speed_gsd, req.shutter_s, sp.photo_m, req.drone_max_speed_ms, wind_ms=req.wind_ms
     )
@@ -256,5 +284,7 @@ def _plan(req: PlanRequest, target_m: float, reference_m: float, spacing_m_: flo
         terrain_source=prof.terrain_source,
         takeoff_elevation_m=prof.takeoff_elevation_m,
         takeoff_elevation_source=prof.takeoff_elevation_source,
+        tilt_deg=tilt if view is not None else 0.0,
+        oblique=view,
     )
     return PlanResult(tuple(missions), summary, tuple(issues))

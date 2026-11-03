@@ -184,6 +184,40 @@ EXPLANATIONS: dict[str, Explanation] = {
         "The camera cannot take photos as quickly as this plan needs.",
         "Fly more slowly, fly higher, or ask for less overlap.",
     ),
+    # ---- scanning one object
+    "SC001": _e(
+        "Too close to the object",
+        "The rings would be closer than 5 metres to the object. GPS is only good to a few "
+        "metres, so the aircraft could touch it.",
+        "Plan again with a larger distance from the object: at least 5 m, and 10 m or more is "
+        "better.",
+    ),
+    "SC002": _e(
+        "Close to the object",
+        "The rings are closer than 10 metres to the object. GPS is only good to a few metres and "
+        "wind can push the aircraft.",
+        "Fly only in calm weather with your hand ready to take over, or plan again with a larger "
+        "distance.",
+    ),
+    "SC003": _e(
+        "A ring would fly too low",
+        "The lowest ring would be less than 3 metres above the ground, where plants, people and "
+        "the ground itself are in the way.",
+        "Raise the lowest height to photograph, or make the camera look up less.",
+    ),
+    "SC005": _e(
+        "The top is covered by photos straight down",
+        "To cover the top of the object the aircraft also flies a small grid above it, taking "
+        "photos straight down. This is the least tested part of the plan.",
+        "Check those photos after the first flight, and fly the top again if the 3D model is poor "
+        "there.",
+    ),
+    "SC006": _e(
+        "A ring is split across missions",
+        "One ring has more waypoints than a single mission can hold, so it continues in the next "
+        "mission.",
+        "Fly all the missions of this plan, one after the other.",
+    ),
     # ---- notes about your setup
     "AVI001": _e(
         "A photo at each waypoint has not been checked for this aircraft",

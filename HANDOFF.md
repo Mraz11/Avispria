@@ -150,8 +150,18 @@
   core/scan_types.py (flat / area_3d / object_3d with recommended settings); app/ui/scan_job.py (object scan from the
   form). A coverage simulation (every photo footprint cast onto flat ground) shows every point seen by >= 9 photos in a
   30-degree crosshatch plan. TODO: (2) the SCREEN (scan-type chooser on Plan a flight, per-type fields, object card with a
-  map pin, object results view) and (3) the guided order (nav Plan > Send > Fly > Check > Make maps, numbered journey on the
-  Start page, 'step n of 5' lines, Next-step buttons). plan_form.py is 332 lines (hard limit 400): split before adding.
+  THEN BUILT (patches 0036, 0037): (3) the guided order: ui/journey.py defines STEPS once (1 Plan a flight, 2 Send to DJI
+  Fly [was 'Phone'], 3 Fly [new screen], 4 Check my photos, 5 Make maps); the top bar, the Start page, a 'Step n of 5' bar
+  and a Next-step card on every step screen use it. (2) the SCREEN: Plan a flight starts with 'What do you want to capture?'
+  (flat / area_3d / object_3d; pages/plan_type.py), applies each kind's recommended settings, shows only that kind's
+  cards (visibility bound to the radio); area_3d adds the tilt field; object_3d has its own where/rings cards
+  (pages/plan_object.py), a PinMap (pages/plan_pin_map.py: ONE pin, same finder as the area map, shared via
+  PlacesMixin._build_finder) and its own results (pages/scan_results.py; the missions table, notes and buttons are
+  shared via plan_results.missions_section). The ground controls moved INTO the settings card (5 numbered cards).
+  Missing explanations for the object scan's codes (SC001..SC006) were added and tests/ui/test_explain.py now looks for
+  the SC prefix. NOT VERIFIED IN A REAL BROWSER: the whole new Plan layout (chooser, per-kind cards, pin map), the Fly
+  screen. NOT FLOWN: tilted 3D missions, waypoint-per-photo missions, rings. Next ideas: a 3D preset in Make maps; a
+  route chart for object plans; plan_map.py is 346 lines (hard limit 400).
   OBJECT SCAN (built 2026-11-02, patch 0032; no flight yet): `avispria scan` (core/scan.py, app/scan_workflow.py,
   docs/field/object-scan.md). Object = upright cylinder; rings at radius+standoff; ring HEIGHTS follow from the heights on
   the surface each ring must be centred on (even, overlapping, base..top) and the tilt schedule (+10 up at the bottom,

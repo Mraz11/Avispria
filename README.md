@@ -152,7 +152,7 @@ light/dark switch in the top corner:
 | Screen | What it does |
 |---|---|
 | **Start** | Shows what your computer can do and whether WebODM is running. |
-| **1. Plan a flight** | Describe the area (by numbers, a map file, or by **drawing it on a map**: polygon, rectangle, circle or line, with parts left out and bands around shapes; find the place by name or use your location, see [the map guide](docs/map.md)), your drone and what you need; get DJI Fly mission files, the route on a map, and the prediction of what you will really get. |
+| **1. Plan a flight** | First choose what to capture: a flat map, a 3D model of an area, or a 3D model of one object. Then describe the area (by numbers, a map file, or by **drawing it on a map**: polygon, rectangle, circle or line, with parts left out and bands around shapes; find the place by name or use your location, see [the map guide](docs/map.md)), your drone and what you need; get DJI Fly mission files, the route on a map, and the prediction of what you will really get. |
 | **2. Send to DJI Fly** | Sends a plan straight into DJI Fly on your Android phone (USB cable or Wi-Fi), with the original kept, and copies a mission from the phone to use as your sample. See [the phone guide](docs/field/phone-bridge.md). |
 | **3. Fly** | A checklist for before you go, at the site and after landing. Nothing to do on the computer. |
 | **4. Check my photos** | A verdict, the key numbers, a map of where each photo was taken, and every warning explained in plain words ("what it means" and "what to do"). Optionally uses an elevation model so results are right over hills. |

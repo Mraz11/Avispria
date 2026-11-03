@@ -7,63 +7,43 @@ from __future__ import annotations
 from nicegui import ui
 
 from avispria.adapters.profiles import DroneProfile
+from avispria.app.ui.pages.plan_form_parts import card, number, show_when, text
 from avispria.app.ui.pages.plan_map import AreaMap
+from avispria.app.ui.pages.plan_object import ObjectCards
 from avispria.app.ui.pages.plan_results import FLY_FILE_HELP
+from avispria.app.ui.pages.plan_settings import AREA_KINDS, SettingsCards
+from avispria.app.ui.pages.plan_type import TypeCard
 from avispria.app.ui.plan_job import PlanForm
 from avispria.app.ui.state import STATE
 from avispria.app.ui.widgets import PathField
 
-
-def _card(title: str) -> ui.column:
-    with ui.card().classes("w-full"):
-        ui.label(title).classes("text-lg font-bold")
-        return ui.column().classes("w-full gap-3")
-
-
-def _number(
-    label: str, value: float, marker: str, width: str = "w-40", **limits: float
-) -> ui.number:
-    field = ui.number(label, value=value, **limits).props("outlined dense").mark(marker)
-    return field.classes(width)
-
-
-def _text(label: str, marker: str, value: str = "", width: str = "w-full", **kw: str) -> ui.input:
-    field = ui.input(label, value=value, **kw).props("outlined dense").classes(width)
-    return field.mark(marker)
-
-
-def _show_when(mode: ui.radio, wanted: str, gap: str = "gap-3") -> ui.column:
-    """A column that is only visible while the radio group has the value ``wanted``."""
-    column = ui.column().classes(f"w-full {gap}")
-    column.bind_visibility_from(mode, "value", backward=lambda v: v == wanted)
-    return column
-
-
-PHOTO_MODE_HELP = (
-    "A photo at every photo point: Avispria puts a waypoint wherever a photo is taken, so you see "
-    "every photo position in DJI Fly and the camera needs no setting. It makes more missions, "
-    "because DJI Fly takes about 99 waypoints in one. Timed shot: only the ends of the lines are "
-    "waypoints and the camera shoots on a timer that you must set in DJI Fly."
+SAMPLE_HELP = (
+    "Avispria copies the exact format your DJI Fly uses from a sample mission. If you have none "
+    "yet: in DJI Fly make a Waypoint Flight with two points and save it (do not fly it), connect "
+    "the phone to this computer, open step 2 and press 'Use as my sample mission'. You do this "
+    "once."
 )
 
 
-class PlanFormUi:
+class PlanFormUi(TypeCard, ObjectCards, SettingsCards):
     """Builds the five cards of the form; ``collect`` reads them into a ``PlanForm``."""
 
     def __init__(self, profiles: dict[str, DroneProfile]) -> None:
         self.profiles = profiles
         names = {key: p.name for key, p in profiles.items()}
         self.first = "lito-x1" if "lito-x1" in names else next(iter(names))
+        self._type_card()
         self._area_card()
+        self._object_where_card()
         self._drone_card(names)
         self._wants_card()
-        self._ground_card()
+        self._object_settings_card()
         self._save_card()
         self._advanced()
 
     # ---------------------------------------------------------------- 1. the area
     def _area_card(self) -> None:
-        with _card("1. The survey area"):
+        with card("2. Where: the area", radio=self.scan_type, kinds=AREA_KINDS):
             self.mode = (
                 ui.radio(
                     {
@@ -76,16 +56,16 @@ class PlanFormUi:
                 .props("inline")
                 .mark("area-mode")
             )
-            with _show_when(self.mode, "numbers"):
-                self.centre = _text(
+            with show_when(self.mode, "numbers"):
+                self.centre = text(
                     "Centre of the area: latitude, longitude",
                     "centre-input",
                     placeholder="23.8103, 90.4125",
                 )
                 with ui.row().classes("gap-3"):
-                    self.width = _number("Width (m)", 200.0, "width-input", min=5, max=5000)
-                    self.length = _number("Length (m)", 300.0, "length-input", min=5, max=5000)
-                    self.area_heading = _number(
+                    self.width = number("Width (m)", 200.0, "width-input", min=5, max=5000)
+                    self.length = number("Length (m)", 300.0, "length-input", min=5, max=5000)
+                    self.area_heading = number(
                         "Direction of the long side (degrees, 0 = north)",
                         0.0,
                         "area-heading-input",
@@ -94,9 +74,9 @@ class PlanFormUi:
                         max=360,
                     )
             self.area_map: AreaMap | None = None
-            self._map_box = _show_when(self.mode, "drawn")
+            self._map_box = show_when(self.mode, "drawn")
             self.mode.on_value_change(lambda _: self._open_map())
-            with _show_when(self.mode, "file", gap="gap-1"):
+            with show_when(self.mode, "file", gap="gap-1"):
                 self.aoi_file = PathField(
                     "Survey area file (GeoJSON)",
                     directory=False,
@@ -105,7 +85,7 @@ class PlanFormUi:
                     hint="Draw your area on a map (for example at geojson.io) and save it "
                     "as GeoJSON.",
                 )
-            self.takeoff = _text(
+            self.takeoff = text(
                 "Takeoff point: latitude, longitude (empty = the middle of the area)",
                 "takeoff-input",
             )
@@ -118,7 +98,7 @@ class PlanFormUi:
 
     # --------------------------------------------------------------- 2. the drone
     def _drone_card(self, names: dict[str, str]) -> None:
-        with _card("2. Your drone"):
+        with card("3. Your drone"):
             modes = list(self.profiles[self.first].modes)
             with ui.row().classes("gap-3 items-center"):
                 self.aircraft = (
@@ -138,6 +118,8 @@ class PlanFormUi:
             self.note = ui.label().classes("text-sm av-caution-text")
             self.aircraft.on_value_change(self._aircraft_changed)
             self._aircraft_changed()
+            ui.label(SAMPLE_HELP).classes("text-sm av-muted").mark("sample-help")
+            ui.link("Open step 2: Send to DJI Fly", "/phone").classes("text-sm")
             self.template = PathField(
                 "Your DJI Fly sample mission (.kmz)",
                 directory=False,
@@ -159,131 +141,12 @@ class PlanFormUi:
         )
 
     # ------------------------------------------------------------- 3. what you want
-    def _wants_card(self) -> None:
-        with _card("3. What you want"):
-            self.target_kind = (
-                ui.radio(
-                    {"resolution": "A ground resolution", "height": "A flying height"},
-                    value="resolution",
-                )
-                .props("inline")
-                .mark("target-kind")
-            )
-            with ui.row().classes("gap-3 items-center"):
-                self.target = _number("Value", 2.0, "target-input", min=0.1, max=300)
-                unit = ui.label().classes("text-sm av-muted")
-            unit.bind_text_from(
-                self.target_kind,
-                "value",
-                backward=lambda v: (
-                    "cm per pixel (smaller = more detail)"
-                    if v == "resolution"
-                    else "metres above the surface"
-                ),
-            )
-            with ui.row().classes("gap-3"):
-                self.front = _number(
-                    "Overlap along the line (%)", 80.0, "front-input", "w-60", min=10, max=95
-                )
-                self.side = _number(
-                    "Overlap between lines (%)", 70.0, "side-input", "w-60", min=10, max=95
-                )
-            self.photo_mode = (
-                ui.select(
-                    {
-                        "waypoint": "A photo at every photo point (recommended)",
-                        "interval": "Timed shot (fewer waypoints)",
-                    },
-                    value="waypoint",
-                    label="How photos are taken",
-                )
-                .props("outlined dense")
-                .classes("w-96")
-                .mark("photo-mode-select")
-            )
-            ui.label(PHOTO_MODE_HELP).classes("text-sm av-muted")
 
     # ---------------------------------------------------------------- 4. the ground
-    def _ground_card(self) -> None:
-        with _card("4. The ground"):
-            self.terrain = (
-                ui.radio(
-                    {"flat": "It is flat", "model": "It has hills (I have an elevation model)"},
-                    value="flat",
-                )
-                .props("inline")
-                .mark("terrain")
-            )
-            with _show_when(self.terrain, "model", gap="gap-1"):
-                self.dem = PathField(
-                    "Elevation model (GeoTIFF)",
-                    directory=False,
-                    suffixes=(".tif", ".tiff"),
-                    marker="dem",
-                    hint="With hills, the route follows the terrain so the photos keep "
-                    "their resolution.",
-                )
-            self.surface = _number(
-                "Height of trees or buildings above the ground (m)",
-                0.0,
-                "surface-input",
-                "w-96",
-                min=0,
-                max=150,
-            )
-            ui.label(
-                "In a forest enter the typical canopy height, so the canopy (not the ground) "
-                "gets the height you asked for. Leave 0 for open ground."
-            ).classes("text-xs av-muted")
 
     # ------------------------------------------------------------- 5. where to save
-    def _save_card(self) -> None:
-        with _card("5. Where to save"):
-            self.out = PathField("Output folder", value=STATE.last_output, marker="out")
-            self.name = _text("Name for the missions", "name-input", "survey", "w-64")
 
     # ----------------------------------------------------------------- advanced
-    def _advanced(self) -> None:
-        with (
-            ui.expansion("Advanced settings", icon="tune").classes("w-full border rounded-lg"),
-            ui.column().classes("gap-3 p-2"),
-        ):
-            self.shutter = _text("Shutter time you expect", "shutter-input", "1/1000", "w-60")
-            with ui.row().classes("gap-3"):
-                self.wind = _number("Wind (m/s)", 0.0, "wind-input", min=0, max=30)
-                self.max_height = _number(
-                    "Highest allowed above takeoff (m)",
-                    120.0,
-                    "max-height-input",
-                    "w-72",
-                    min=10,
-                    max=500,
-                )
-                self.max_distance = _number(
-                    "Farthest from takeoff (m)",
-                    500.0,
-                    "max-distance-input",
-                    "w-60",
-                    min=50,
-                    max=5000,
-                )
-                self.battery = _number(
-                    "Flying time per battery (min)", 20.0, "battery-input", "w-64", min=3, max=60
-                )
-            self.heading = _text(
-                "Direction of the flight lines in degrees (empty = automatic)",
-                "heading-input",
-                width="w-96",
-            )
-            self.crosshatch = ui.switch(
-                "Fly a second set of lines across the first (better 3D, twice the flying)"
-            ).mark("crosshatch-switch")
-            self.calibrate = ui.switch(
-                "Tune height and spacing to the real terrain", value=True
-            ).mark("calibrate-switch")
-            self.straight = ui.switch("Straight legs between waypoints", value=True).mark(
-                "straight-switch"
-            )
 
     # ------------------------------------------------------------------ reading it
     def _drawn_geojson(self) -> str:
@@ -297,7 +160,22 @@ class PlanFormUi:
         return ""
 
     def collect(self) -> PlanForm:
+        kind = self.scan_type.value
+        is_object = kind == "object_3d"
         return PlanForm(
+            scan_type=kind,
+            tilt_deg=float(self.tilt.value or 0.0) if kind == "area_3d" else 0.0,
+            object_centre=self.object_centre.value or "",
+            object_height_m=self.object_height.value or 0.0,
+            object_radius_m=self.object_radius.value or 0.0,
+            standoff_m=self.standoff.value or 0.0,
+            base_height_m=self.base_height.value or 0.0,
+            ground_offset_m=self.ground_offset.value or 0.0,
+            look_up_deg=self.look_up.value or 0.0,
+            look_down_deg=self.look_down.value or 0.0,
+            top_cap=bool(self.top_cap.value),
+            hover_s=self.hover.value or 0.0,
+            scan_speed_ms=self.scan_speed.value or 0.0,
             area_mode=self.mode.value,
             centre=self.centre.value or "",
             width_m=self.width.value or 0.0,
@@ -306,14 +184,14 @@ class PlanFormUi:
             aoi_file=self.aoi_file.value,
             drawn_area_geojson=self._drawn_geojson(),
             drawn_area_problem=self._drawn_problem(),
-            takeoff=self.takeoff.value or "",
+            takeoff=(self.object_takeoff.value if is_object else self.takeoff.value) or "",
             aircraft=self.aircraft.value,
             camera_mode=self.camera.value or "",
             template=self.template.value,
             target_kind=self.target_kind.value,
             target_value=self.target.value or 0.0,
-            front_percent=self.front.value or 0.0,
-            side_percent=self.side.value or 0.0,
+            front_percent=(self.obj_front.value if is_object else self.front.value) or 0.0,
+            side_percent=(self.obj_side.value if is_object else self.side.value) or 0.0,
             photo_mode=self.photo_mode.value,
             terrain=self.terrain.value,
             dem_file=self.dem.value,

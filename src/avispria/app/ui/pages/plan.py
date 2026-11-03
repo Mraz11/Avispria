@@ -13,16 +13,17 @@ from avispria.app.ui.jobs import run_job
 from avispria.app.ui.layout import frame
 from avispria.app.ui.pages.plan_form import PlanFormUi
 from avispria.app.ui.pages.plan_results import show_plan
+from avispria.app.ui.pages.scan_results import show_scan
 from avispria.app.ui.plan_job import execute_plan
+from avispria.app.ui.scan_job import execute_scan
 from avispria.app.ui.state import STATE
 
 
 async def plan_page() -> None:
     with frame("Plan a flight"):
         ui.label(
-            "Describe the area you want to map and what you need from the photos. Avispria "
-            "makes missions for DJI Fly and tells you what resolution and overlap you will "
-            "really get over your terrain."
+            "Answer the five steps from the top. Avispria then makes missions for DJI Fly and "
+            "tells you what you will really get."
         ).classes("text-base")
         form_ui = PlanFormUi(load_profiles())
         button = ui.button("Plan the flight", icon="flight").props("no-caps size=lg").mark("run")
@@ -35,7 +36,8 @@ async def plan_page() -> None:
         with results:
             ui.spinner(size="lg")
             ui.label("Planning the flight (hilly sites take a little longer)...")
-        outcome = await run_job(execute_plan, form)
+        is_object = form.scan_type == "object_3d"
+        outcome = await run_job(execute_scan if is_object else execute_plan, form)
         button.enable()
         results.clear()
         if not outcome.ok or outcome.value is None:
@@ -47,6 +49,10 @@ async def plan_page() -> None:
         STATE.last_output = form.out_dir
         if outcome.value.outputs is not None:
             STATE.last_plan_files = [str(p) for p in outcome.value.outputs.kmz_paths]
-        show_plan(results, outcome.value, Path(form.out_dir).expanduser())
+        shown = Path(form.out_dir).expanduser()
+        if is_object:
+            show_scan(results, outcome.value, shown)
+        else:
+            show_plan(results, outcome.value, shown)
 
     button.on_click(run)

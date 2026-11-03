@@ -25,11 +25,9 @@ from avispria.app.ui.map_events import event_layer, parse_layer
 from avispria.app.ui.pages.plan_map_edit import EDIT_CSS, EditingMixin
 from avispria.app.ui.pages.plan_map_places import PlacesMixin
 from avispria.app.ui.pages.plan_map_text import (
-    BACKGROUND_NOTE,
     HELP,
     KIND_ICONS,
     LEAVE_OUT_NOTE,
-    PRIVACY_NOTE,
     ROLE_COLOURS,
     ROLE_LABELS,
 )
@@ -43,11 +41,6 @@ from avispria.core.shapes import (
     build_area,
     shape_size,
     suggest_role,
-)
-
-OSM_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-OSM_ATTRIBUTION = (
-    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 )
 
 
@@ -80,42 +73,7 @@ class AreaMap(EditingMixin, PlacesMixin):
             EDIT_CSS
         )  # hides Leaflet's own edit tool, which cannot work here; styles corner labels
         ui.label(HELP).classes("text-sm av-muted")
-        with ui.row().classes("w-full items-center gap-3"):
-            self.background = ui.switch(
-                "Show map background (uses the internet)", on_change=lambda _: self._background()
-            ).mark("map-background")
-        with ui.row().classes("w-full items-center gap-3"):
-            self.goto = (
-                ui.input("Find a place, or type latitude, longitude")
-                .props("outlined dense")
-                .classes("w-96")
-                .mark("map-goto-input")
-            )
-            self.goto.on("keydown.enter", self.find)
-            ui.button("Search", icon="search", on_click=self.find).props("no-caps outline").mark(
-                "map-goto"
-            )
-            ui.button("My location", icon="my_location", on_click=self.my_location).props(
-                "no-caps outline"
-            ).mark("map-location")
-        self.places_box = ui.column().classes("w-full gap-1")
-        with ui.expansion("Map background and place search settings", icon="layers").classes(
-            "w-full"
-        ):
-            self.search_service = (
-                ui.input("Place search service address (empty = OpenStreetMap's)")
-                .props("outlined dense")
-                .classes("w-full")
-                .mark("map-search-service")
-            )
-            self.tile_url = (
-                ui.input("Tile address, like https://example.com/{z}/{x}/{y}.png")
-                .props("outlined dense")
-                .classes("w-full")
-                .mark("map-tile-url")
-            )
-            ui.label(BACKGROUND_NOTE).classes("text-sm av-muted")
-            ui.label(PRIVACY_NOTE).classes("text-sm av-muted")
+        self._build_finder()
         self.map = (
             ui.leaflet(
                 center=(20.0, 0.0),
@@ -189,17 +147,6 @@ class AreaMap(EditingMixin, PlacesMixin):
             self._on_takeoff("")  # the pin goes, and so must the coordinates it put in the form
         self.chosen = 0
         self._refresh()
-
-    def _background(self) -> None:
-        if self._tile_layer is not None:
-            self.map.remove_layer(self._tile_layer)
-            self._tile_layer = None
-        if self.background.value:
-            url = (self.tile_url.value or "").strip() or OSM_URL
-            attribution = OSM_ATTRIBUTION if url == OSM_URL else "Map background: your own source"
-            self._tile_layer = self.map.tile_layer(
-                url_template=url, options={"maxZoom": 19, "attribution": attribution}
-            )
 
     # ----------------------------------------------------------------- the result
     def _refresh(self) -> None:

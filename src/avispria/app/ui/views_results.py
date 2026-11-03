@@ -12,7 +12,7 @@ from avispria.app.ui.views import Tile, Verdict, pct
 from avispria.core.plan_model import PlanResult
 from avispria.core.safety import Issue
 
-SERIOUS_PLAN_CODES = {"PL001", "PL002", "SAF003", "SAF008", "QA006", "QA010", "QA014"}
+SERIOUS_PLAN_CODES = {"PL001", "PL002", "SAF003", "SAF008", "SC002", "QA006", "QA010", "QA014"}
 
 
 # ------------------------------------------------------------------- flight plan

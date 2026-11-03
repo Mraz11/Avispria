@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 from nicegui.testing import User
 
-from avispria.app.ui.pages.plan_map import OSM_URL
+from avispria.app.ui.pages.plan_map_text import OSM_URL
 from avispria.core.shapes import Role
 from uihelpers import eventually, set_text, value_of
 

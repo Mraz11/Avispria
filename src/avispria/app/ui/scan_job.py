@@ -23,6 +23,7 @@ class ScanJobResult:
     blocked: list[Issue] = field(default_factory=list)
     centre: tuple[float, float] | None = None  # (lon, lat) of the object
     takeoff: tuple[float, float] | None = None
+    request: ScanRequest | None = None
 
 
 def build_scan(
@@ -103,5 +104,5 @@ def execute_scan(form: PlanForm, *, now_ms: int | None = None) -> ScanJobResult:
         return ScanJobResult(blocked=list(exc.issues))
     first = outputs.plan.missions[0].takeoff
     return ScanJobResult(
-        outputs, [], (request.centre_lon, request.centre_lat), (first.lon, first.lat)
+        outputs, [], (request.centre_lon, request.centre_lat), (first.lon, first.lat), request
     )

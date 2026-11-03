@@ -6,7 +6,7 @@ from pathlib import Path
 from avispria.app.ui.explain import EXPLANATIONS, explain
 
 SRC = Path(__file__).resolve().parents[2] / "src" / "avispria"
-CODE = re.compile(r'"((?:QA|SAF|RQ|PL|AVI|WPML)\d{3})"')
+CODE = re.compile(r'"((?:QA|SAF|RQ|PL|AVI|WPML|SC)\d{3})"')
 
 
 def emitted_codes() -> set[str]:

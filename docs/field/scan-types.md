@@ -9,6 +9,22 @@ photos become a result. (The command line: `plan` for the first two, `scan` for 
 | **3D model of an area** | a 3D model of ground, trees and buildings | tilted about 30 degrees, lines in TWO directions (about twice the photos and flying) |
 | **3D model of one object** | a 3D model of one tree or building | rings around it at several heights, always facing it, camera up at the bottom and down at the top |
 
+## On the screen (step 1, Plan a flight)
+
+The first card asks what you want to capture. Your answer shows only the cards that kind needs and sets
+their recommended values (you can change them afterwards):
+
+- **Flat map**: the area (numbers, a map file, or drawn on a map), resolution or height, overlaps, how photos
+  are taken, the ground.
+- **3D model of an area**: the same, plus the camera tilt (30 degrees to start with) and lines in two
+  directions.
+- **3D model of one object**: the object (a pin on a map, or latitude and longitude, its height and widest
+  radius) and the rings (distance from the object, lowest height, overlaps, how far the camera looks up
+  and down, how long to stand still at each photo, the speed, the photos over the top).
+
+The numbered cards are 1 What, 2 Where, 3 Your drone, 4 Settings, 5 Where to save. The sample mission
+(step 3) comes from DJI Fly once: the screen says how, and links to the Send to DJI Fly step.
+
 ## A photo at every photo point
 
 Avispria puts a waypoint wherever a photo is taken (not only where the aircraft turns). You see every photo

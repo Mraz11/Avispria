@@ -49,3 +49,8 @@ LEAVE_OUT_NOTE = (
     "Parts you leave out are not planned for coverage, but the aircraft may still fly over them to "
     "turn or to reach the next line. Do not rely on this for anything that must not be overflown."
 )
+
+OSM_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+OSM_ATTRIBUTION = (
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+)

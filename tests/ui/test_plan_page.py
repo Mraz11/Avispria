@@ -29,18 +29,98 @@ def fill(user: User, form: PlanForm) -> None:
 async def test_the_screen_asks_for_everything_in_plain_words(user: User) -> None:
     await user.open("/plan")
     for text in (
-        "1. The survey area",
-        "2. Your drone",
-        "3. What you want",
-        "4. The ground",
+        "1. What do you want to capture?",
+        "2. Where: the area",
+        "3. Your drone",
+        "4. Settings",
         "5. Where to save",
         "Advanced settings",
         "Plan the flight",
         "cm per pixel (smaller = more detail)",
+        "The ground",
     ):
         await user.should_see(text)
     await user.should_not_see("Elevation model (GeoTIFF)")  # only for hilly sites
     await user.should_not_see("have not been verified")  # the Lito X1 profile is verified
+
+
+async def test_the_steps_are_numbered_in_the_order_they_are_filled_in(user: User) -> None:
+    await user.open("/plan")
+    await user.should_see("1. What do you want to capture?")
+    await user.should_see("Open step 2: Send to DJI Fly")  # where the sample mission comes from
+    await user.should_see("Use as my sample mission")
+    titles = [
+        "1. What do you want to capture?",
+        "2. Where: the area",
+        "3. Your drone",
+        "4. Settings",
+        "5. Where to save",
+    ]
+    from nicegui import ui
+
+    labels = [e for e in user.find(kind=ui.label).elements if e.text in titles]
+    assert {e.text for e in labels} == set(titles)
+    ids = {e.text: e.id for e in labels}  # element ids grow in the order the cards were built
+    assert [ids[x] for x in titles] == sorted(ids[x] for x in titles)
+
+
+async def test_a_flat_map_shows_only_what_a_flat_map_needs(user: User) -> None:
+    await user.open("/plan")
+    await user.should_see("Flat map of an area")
+    await user.should_see("A top-down map")
+    await user.should_see("Overlap along the line (%)")
+    for hidden in (
+        "Camera tilt (degrees from straight down)",
+        "2. Where: the object",
+        "4. Settings: the rings",
+        "Distance from the object (m)",
+    ):
+        await user.should_not_see(hidden)
+
+
+async def test_a_3d_model_of_an_area_adds_the_tilt_and_sets_its_own_values(user: User) -> None:
+    await user.open("/plan")
+    next(iter(user.find(marker="scan-type").elements)).set_value("area_3d")
+    await user.should_see("Camera tilt (degrees from straight down)")
+    await user.should_see("The lines are flown in two directions")
+    await user.should_see("A 3D model of a site")
+    assert value_of(user, "tilt-input") == "30.0" or value_of(user, "tilt-input") == "30"
+    assert value_of(user, "target-input") in ("2.5", "2.5000000000000004")
+    assert next(iter(user.find(marker="crosshatch-switch").elements)).value is True
+    user.notify.contains("Settings set to what suits: 3D model of an area")
+    await user.should_not_see("4. Settings: the rings")
+    next(iter(user.find(marker="scan-type").elements)).set_value("flat")  # and back again
+    await user.should_not_see("Camera tilt (degrees from straight down)")
+    assert value_of(user, "target-input") == "2.0"
+    assert next(iter(user.find(marker="crosshatch-switch").elements)).value is False
+
+
+async def test_a_3d_model_of_one_object_swaps_the_area_cards_for_the_object_cards(
+    user: User,
+) -> None:
+    await user.open("/plan")
+    next(iter(user.find(marker="scan-type").elements)).set_value("object_3d")
+    for shown in (
+        "2. Where: the object",
+        "4. Settings: the rings",
+        "Position of the object: latitude, longitude",
+        "Distance from the object (m)",
+        "Camera looks up at the bottom by (degrees)",
+        "A few photos straight down over the top",
+        "Place it on a map",
+        "circles the object in rings",
+    ):
+        await user.should_see(shown)
+    for hidden in (
+        "2. Where: the area",
+        "Overlap along the line (%)",
+        "Camera tilt (degrees from straight down)",
+        "Describe it with numbers",
+        "Tune height and spacing",
+        "Shutter time you expect",
+    ):
+        await user.should_not_see(hidden)
+    await user.should_see("Highest allowed above takeoff")  # the safety limits apply to every kind
 
 
 async def test_planning_end_to_end_shows_prediction_route_and_missions(

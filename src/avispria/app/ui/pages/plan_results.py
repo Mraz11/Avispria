@@ -53,6 +53,17 @@ def show_plan(box: ui.column, result: PlanJobResult, out_dir: Path) -> None:
                     f"In DJI Fly, set the camera to timed shot every "
                     f"{plan.summary.photo_interval_s:.1f} seconds (or shorter) before you start."
                 ).classes("font-medium")
+        else:
+            missions = len(plan.missions)
+            with ui.card().classes("w-full av-note-info").mark("photo-waypoint-note"):
+                ui.label(
+                    "A photo is taken at every photo waypoint: the camera needs no timed shot."
+                ).classes("font-medium")
+                if missions > 1:
+                    ui.label(
+                        f"This plan is in {missions} missions, so you need {missions} placeholder "
+                        "missions (slots) in DJI Fly. The Phone screen sends them all in one go."
+                    ).classes("text-sm")
         tile_row(plan_tiles(plan))
         ui.label("The route").classes("text-lg font-bold")
         ui.label(

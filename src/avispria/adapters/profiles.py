@@ -23,6 +23,7 @@ class DroneProfile:
     waypoint_limit: int
     verified: bool
     notes: str
+    photo_action_verified: bool  # a Take Photo at each waypoint, checked in DJI Fly's own files
     modes: dict[str, CameraProfile]
 
 
@@ -53,6 +54,7 @@ def _parse(data: dict[str, Any]) -> dict[str, DroneProfile]:
             waypoint_limit=int(raw["waypoint_limit"]),
             verified=bool(raw.get("verified", False)),
             notes=str(raw.get("notes", "")),
+            photo_action_verified=bool(raw.get("photo_action_verified", False)),
             modes=modes,
         )
     return profiles

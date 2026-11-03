@@ -74,7 +74,8 @@ def test_plan_flat_writes_lint_clean_files(aoi: Path, tmp_path: Path) -> None:
     out = tmp_path / "out"
     result = _plan(aoi, out, "--flat")
     assert result.exit_code == 0, result.output
-    assert "Set DJI Fly timed shot" in result.output
+    assert "A photo is taken at every photo waypoint" in result.output  # the default
+    assert "Set DJI Fly timed shot" not in result.output
     kmz = sorted(out.glob("*.kmz"))
     assert kmz and all(lint_kmz(p.read_bytes(), LintLimits(max_speed_ms=12.0)) == [] for p in kmz)
     assert sorted(out.glob("*_spotcheck.csv"))
@@ -82,6 +83,7 @@ def test_plan_flat_writes_lint_clean_files(aoi: Path, tmp_path: Path) -> None:
     assert report["missions"][0]["plan_hash"]
     codes = {w["code"] for w in report["warnings"]}
     assert "SAF008" in codes and "AVI003" not in codes  # Lito X1 profile is verified
+    assert "AVI001" not in codes  # and so is its photo action, which DJI Fly's own files showed
 
 
 def test_unverified_profile_is_flagged(aoi: Path, tmp_path: Path) -> None:
@@ -111,10 +113,29 @@ def test_blocked_plan_writes_nothing(aoi: Path, tmp_path: Path) -> None:
     assert not out.exists()
 
 
-def test_photo_waypoint_mode_warns_about_unverified_encoding(aoi: Path, tmp_path: Path) -> None:
-    result = _plan(aoi, tmp_path / "out", "--flat", "--photo-mode", "waypoint")
-    assert result.exit_code == 0, result.output
-    assert "AVI001" in result.output
+def test_a_photo_at_every_waypoint_is_the_default_and_timed_shot_still_works(
+    aoi: Path, tmp_path: Path
+) -> None:
+    waypoint = _plan(aoi, tmp_path / "w", "--flat")
+    assert waypoint.exit_code == 0 and "A photo is taken at every photo waypoint" in waypoint.output
+    report = json.loads((tmp_path / "w" / "plan_report.json").read_text())
+    assert report["missions"][0]["photos"] > 0  # photo waypoints are flagged in the file
+    timed = _plan(aoi, tmp_path / "t", "--flat", "--photo-mode", "interval")
+    assert timed.exit_code == 0 and "Set DJI Fly timed shot" in timed.output
+    assert (
+        json.loads((tmp_path / "t" / "plan_report.json").read_text())["missions"][0]["photos"] == 0
+    )
+
+
+def test_the_photo_action_is_only_flagged_for_an_aircraft_nobody_has_checked(
+    aoi: Path, tmp_path: Path
+) -> None:
+    lito = _plan(aoi, tmp_path / "a", "--flat", "--photo-mode", "waypoint")
+    assert (
+        lito.exit_code == 0 and "AVI001" not in lito.output
+    )  # DJI Fly's own files settled the Lito X1
+    mini = _plan(aoi, tmp_path / "b", "--flat", "--photo-mode", "waypoint", "--drone", "mini-4-pro")
+    assert mini.exit_code == 0 and "AVI001" in mini.output
 
 
 def test_inspect_lint_and_sheet(tmp_path: Path) -> None:

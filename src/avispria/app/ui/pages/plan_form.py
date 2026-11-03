@@ -39,6 +39,14 @@ def _show_when(mode: ui.radio, wanted: str, gap: str = "gap-3") -> ui.column:
     return column
 
 
+PHOTO_MODE_HELP = (
+    "A photo at every photo point: Avispria puts a waypoint wherever a photo is taken, so you see "
+    "every photo position in DJI Fly and the camera needs no setting. It makes more missions, "
+    "because DJI Fly takes about 99 waypoints in one. Timed shot: only the ends of the lines are "
+    "waypoints and the camera shoots on a timer that you must set in DJI Fly."
+)
+
+
 class PlanFormUi:
     """Builds the five cards of the form; ``collect`` reads them into a ``PlanForm``."""
 
@@ -183,16 +191,17 @@ class PlanFormUi:
             self.photo_mode = (
                 ui.select(
                     {
-                        "interval": "Timed shot (recommended)",
-                        "waypoint": "A photo at each waypoint (experimental)",
+                        "waypoint": "A photo at every photo point (recommended)",
+                        "interval": "Timed shot (fewer waypoints)",
                     },
-                    value="interval",
+                    value="waypoint",
                     label="How photos are taken",
                 )
                 .props("outlined dense")
-                .classes("w-80")
+                .classes("w-96")
                 .mark("photo-mode-select")
             )
+            ui.label(PHOTO_MODE_HELP).classes("text-sm av-muted")
 
     # ---------------------------------------------------------------- 4. the ground
     def _ground_card(self) -> None:

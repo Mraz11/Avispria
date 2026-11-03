@@ -56,7 +56,8 @@ async def test_planning_end_to_end_shows_prediction_route_and_missions(
     await user.should_see(kind=ui.echart)
     await user.should_see("Missions")
     await user.should_see("How do I get these missions onto my drone?")
-    await user.should_see("set the camera to timed shot every")
+    await user.should_see("A photo is taken at every photo waypoint")  # the default now
+    await user.should_not_see("set the camera to timed shot")
     await user.should_see("Planned without terrain data")  # SAF008, explained
     assert (
         list(Path(plan_form.out_dir).glob("*.kmz"))
@@ -150,3 +151,36 @@ async def test_asking_for_a_height_instead_of_a_resolution(user: User, plan_form
     set_text(user, "target-input", "60")
     user.find(marker="run").click()
     await user.should_see("flying 60 m above the surface")
+
+
+async def test_timed_shot_is_still_available_and_says_what_to_set_on_the_camera(
+    user: User, plan_form: PlanForm
+) -> None:
+    await user.open("/plan")
+    fill(user, plan_form)
+    next(iter(user.find(marker="photo-mode-select").elements)).set_value("interval")
+    user.find(marker="run").click()
+    await user.should_see("set the camera to timed shot every", retries=300)
+    await user.should_not_see("A photo is taken at every photo waypoint")
+
+
+async def test_a_big_area_needs_several_missions_and_the_screen_says_how_many_slots(
+    user: User, plan_form: PlanForm
+) -> None:
+    await user.open("/plan")
+    fill(user, plan_form)
+    set_text(user, "width-input", "400")
+    set_text(user, "length-input", "400")
+    user.find(marker="run").click()
+    await user.should_see("placeholder missions (slots) in DJI Fly", retries=300)
+    await user.should_see("The Phone screen sends them all in one go")
+
+
+async def test_the_form_explains_the_two_ways_of_taking_photos(user: User) -> None:
+    await user.open("/plan")
+    await user.should_see("A photo at every photo point (recommended)")
+    await user.should_see("DJI Fly takes about 99 waypoints in one")
+    assert value_of(user, "photo-mode-select") in (
+        "waypoint",
+        "A photo at every photo point (recommended)",
+    )

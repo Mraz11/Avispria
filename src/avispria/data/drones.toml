@@ -9,6 +9,7 @@ max_speed_ms = 12.0            # DJI Fly SPEEDCapability.json for waypoint missi
 drone_enum = 68                # observed in a DJI Fly mission from a Lito X1 (verified)
 waypoint_limit = 99            # conservative; a secondary source claims 200 (unverified)
 verified = true                # geometry from EXIF of original DNGs; timing still to measure
+photo_action_verified = true   # Take Photo at a waypoint, read from missions made in DJI Fly (docs/field/dji-fly-mission-format.md)
 notes = "FC9589 1/1.3-inch 48 MP, electronic (rolling) shutter. Sensor size from EXIF focal 6.72 mm and 35 mm-equivalent 24 mm (CIPA diagonal definition). Waypoint speed 0.1-12 m/s, gimbal -90..+40 from DJI Fly capability files."
 
 [lito-x1.modes.12mp]

@@ -44,7 +44,13 @@ def plan(
     side: float = 0.7,
     heading: Annotated[float | None, typer.Option(help="Line heading (deg); default auto")] = None,
     crosshatch: bool = False,
-    photo_mode: Annotated[PhotoMode, typer.Option(case_sensitive=False)] = PhotoMode.INTERVAL,
+    photo_mode: Annotated[
+        PhotoMode,
+        typer.Option(
+            case_sensitive=False,
+            help="waypoint: a photo at every waypoint (default); interval: timed shot",
+        ),
+    ] = PhotoMode.WAYPOINT,
     shutter: Annotated[str, typer.Option(help="Expected shutter, e.g. 1/1000")] = "1/1000",
     wind: Annotated[float, typer.Option(help="Wind speed (m/s)")] = 0.0,
     max_height: Annotated[float, typer.Option(help="Max height above takeoff (m)")] = 120.0,
@@ -124,6 +130,13 @@ def plan(
     if s.photo_interval_s is not None:
         typer.secho(
             f"  Set DJI Fly timed shot to {s.photo_interval_s:.1f} s or shorter before starting.",
+            fg=typer.colors.CYAN,
+        )
+    else:
+        count = len(res.result.missions)
+        typer.secho(
+            "  A photo is taken at every photo waypoint: no timed shot to set."
+            + (f" {count} missions: you need {count} slots in DJI Fly." if count > 1 else ""),
             fg=typer.colors.CYAN,
         )
     for m, path in zip(res.result.missions, res.kmz_paths, strict=True):

@@ -45,7 +45,7 @@ class PlanOptions:
     side_overlap: float = 0.7
     heading_deg: float | None = None
     crosshatch: bool = False
-    photo_mode: PhotoMode = PhotoMode.INTERVAL
+    photo_mode: PhotoMode = PhotoMode.WAYPOINT  # a waypoint at every photo point
     dem_path: Path | None = None
     flat_terrain: bool = False
     takeoff_elevation_m: float | None = None
@@ -76,14 +76,18 @@ def _extra_warnings(
     template: DummyTemplate, profile: DroneProfile, opts: PlanOptions
 ) -> list[Issue]:
     out: list[Issue] = []
-    if opts.photo_mode is PhotoMode.WAYPOINT and not template.has_photo_action:
+    if (
+        opts.photo_mode is PhotoMode.WAYPOINT
+        and not template.has_photo_action
+        and not profile.photo_action_verified
+    ):
         out.append(
             Issue(
                 "warning",
                 "AVI001",
-                "the dummy mission has no Take Photo action, so the photo action encoding is "
-                "unverified for this aircraft; prefer interval mode until a probe flight "
-                "confirms it",
+                "the sample mission has no Take Photo action and the photo action has not been "
+                "checked for this aircraft, so the standard DJI one was written; if the first "
+                "test takes no photos, use timed shot instead",
             )
         )
     if template.drone_enum != profile.drone_enum:

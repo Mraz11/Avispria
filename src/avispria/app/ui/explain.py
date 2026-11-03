@@ -186,9 +186,9 @@ EXPLANATIONS: dict[str, Explanation] = {
     ),
     # ---- notes about your setup
     "AVI001": _e(
-        "Photo-at-waypoint mode is not verified yet",
-        "Your DJI Fly sample mission has no 'Take Photo' action, so Avispria cannot copy exactly how DJI Fly stores it.",
-        "Use timed shot (interval) mode: set the interval shown in the plan in DJI Fly before starting.",
+        "A photo at each waypoint has not been checked for this aircraft",
+        "Your sample mission has no 'Take Photo' action to copy, and this aircraft's photo action has not been checked, so Avispria wrote the standard DJI one (the same that DJI Fly writes on the Lito X1).",
+        "Test it first: if no photos are taken, plan again with 'timed shot' as how photos are taken, and set that interval in DJI Fly.",
     ),
     "AVI002": _e(
         "Aircraft ID differs from the profile",

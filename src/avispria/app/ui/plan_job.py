@@ -50,7 +50,9 @@ class PlanForm:
     target_value: float = 2.0
     front_percent: float = 80.0
     side_percent: float = 70.0
-    photo_mode: str = "interval"
+    photo_mode: str = (
+        "waypoint"  # "waypoint" (a photo at every waypoint) or "interval" (timed shot)
+    )
     # terrain
     terrain: str = "flat"  # "flat" or "model"
     dem_file: str = ""

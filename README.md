@@ -143,18 +143,24 @@ Planning flights and checking photos work without it. To make maps, install **We
 
 ### The window interface (no terminal needed)
 
-Start it as described above. It has four screens and a light/dark switch in the top corner:
+A flight project has five steps; the window shows them in this order, with "Step n of 5" at the top of each
+screen and a button to the next step at the bottom.
+
+Start it as described above. It has a Start screen, one screen for each of the five steps, and a
+light/dark switch in the top corner:
 
 | Screen | What it does |
 |---|---|
 | **Start** | Shows what your computer can do and whether WebODM is running. |
-| **Check my photos** | A verdict, the key numbers, a map of where each photo was taken, and every warning explained in plain words ("what it means" and "what to do"). Optionally uses an elevation model so results are right over hills. |
-| **Plan a flight** | Describe the area (by numbers, a map file, or by **drawing it on a map**: polygon, rectangle, circle or line, with parts left out and bands around shapes; find the place by name or use your location, see [the map guide](docs/map.md)), your drone and what you need; get DJI Fly mission files, the route on a map, and the prediction of what you will really get. |
-| **Make maps** | Pick the photos and a quality level; Avispria checks that your computer can handle the job, follows the progress (you can cancel), and gives you the orthophoto, surface model and point cloud. |
-| **Phone** | Sends a plan straight into DJI Fly on your Android phone (USB cable or Wi-Fi), with the original kept, and copies a mission from the phone to use as your sample. See [the phone guide](docs/field/phone-bridge.md). |
+| **1. Plan a flight** | Describe the area (by numbers, a map file, or by **drawing it on a map**: polygon, rectangle, circle or line, with parts left out and bands around shapes; find the place by name or use your location, see [the map guide](docs/map.md)), your drone and what you need; get DJI Fly mission files, the route on a map, and the prediction of what you will really get. |
+| **2. Send to DJI Fly** | Sends a plan straight into DJI Fly on your Android phone (USB cable or Wi-Fi), with the original kept, and copies a mission from the phone to use as your sample. See [the phone guide](docs/field/phone-bridge.md). |
+| **3. Fly** | A checklist for before you go, at the site and after landing. Nothing to do on the computer. |
+| **4. Check my photos** | A verdict, the key numbers, a map of where each photo was taken, and every warning explained in plain words ("what it means" and "what to do"). Optionally uses an elevation model so results are right over hills. |
+| **5. Make maps** | Pick the photos and a quality level; Avispria checks that your computer can handle the job, follows the progress (you can cancel), and gives you the orthophoto, surface model and point cloud. |
 
-Everything stays on your computer. The interface listens on `127.0.0.1` only, so nothing is sent
-anywhere and nothing is reachable from the network.
+Everything stays on your computer, except two optional things that use the internet only when you use
+them: the map background and the place search in the map (see [the map guide](docs/map.md)). The
+interface listens on `127.0.0.1` only, so nothing is reachable from the network.
 
 To plan a flight you need **your own DJI Fly sample mission** (a two-point waypoint mission saved in DJI
 Fly and copied to the computer): Avispria copies the exact file format your DJI Fly uses from it. The

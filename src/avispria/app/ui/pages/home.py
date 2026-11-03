@@ -10,33 +10,10 @@ from nicegui import ui
 
 from avispria.app.doctor import run_doctor
 from avispria.app.ui.jobs import run_job
+from avispria.app.ui.journey import STEPS, nav_label
 from avispria.app.ui.layout import TAGLINE, frame, logo
 from avispria.app.ui.views import system_rows
 from avispria.app.ui.widgets import status_rows
-
-TASKS = (
-    (
-        "Check my photos",
-        "See whether your photos overlap enough and where the weak spots are, before you "
-        "spend hours processing them.",
-        "/check",
-        "photo_library",
-    ),
-    (
-        "Plan a flight",
-        "Describe the area you want to map and get missions for DJI Fly, with a prediction "
-        "of the resolution and overlap you will really get.",
-        "/plan",
-        "flight",
-    ),
-    (
-        "Make maps",
-        "Turn your photos into an orthophoto, a surface model and a point cloud, using "
-        "WebODM on this computer.",
-        "/process",
-        "map",
-    ),
-)
 
 
 async def home_page() -> None:
@@ -51,16 +28,29 @@ async def home_page() -> None:
                     "own computer. Nothing is sent anywhere unless you ask: the map background "
                     "and the place search in the map contact OpenStreetMap, only when you use them."
                 )
-        with ui.row().classes("w-full gap-4"):
-            for title, text, target, icon in TASKS:
-                with ui.card().classes("min-w-[16rem] grow"):
+        ui.label("A flight project has five steps. Do them in this order.").classes(
+            "text-lg font-bold"
+        )
+        for step in STEPS:
+            first = step.number == 1
+            with (
+                ui.card()
+                .classes("w-full" + (" av-note-info" if first else ""))
+                .mark(f"step-{step.number}"),
+                ui.row().classes("w-full items-center gap-4 no-wrap"),
+            ):
+                ui.badge(str(step.number)).props("color=primary rounded").classes("text-lg")
+                ui.icon(step.icon).classes("text-3xl text-primary")
+                with ui.column().classes("gap-0 grow"):
                     with ui.row().classes("items-center gap-2"):
-                        ui.icon(icon).classes("text-3xl text-primary")
-                        ui.label(title).classes("text-lg font-bold")
-                    ui.label(text).classes("text-sm av-muted")
-                    ui.button("Open", on_click=lambda t=target: ui.navigate.to(t)).props(
-                        "no-caps"
-                    ).mark(f"open-{target.strip('/')}")
+                        ui.label(step.title).classes("text-lg font-bold")
+                        if first:
+                            ui.badge("Start here").props("color=positive")
+                    ui.label(step.what).classes("text-sm av-muted")
+                ui.button(
+                    "Open" if not first else f"Start: {nav_label(step)}",
+                    on_click=lambda t=step.path: ui.navigate.to(t),
+                ).props("no-caps").mark(f"open-{step.path.strip('/')}")
         with ui.card().classes("w-full"):
             with ui.row().classes("w-full items-center justify-between"):
                 ui.label("Your computer").classes("text-lg font-bold")

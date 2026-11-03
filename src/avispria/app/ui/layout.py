@@ -10,6 +10,7 @@ from pathlib import Path
 
 from nicegui import ui
 
+from avispria.app.ui.journey import journey_bar, nav_items, nav_label, next_step_card, step_for
 from avispria.app.ui.theme import THEME_BOOT_JS, tokens_css
 from avispria.app.ui.theme_state import ThemeState, attach
 from avispria.core.version import __version__
@@ -18,13 +19,7 @@ ASSETS = Path(__file__).parent / "assets"
 COMPONENT_CSS = (ASSETS / "avispria.css").read_text(encoding="utf-8")
 TAGLINE = "Canopy structure and change, seen from above."
 
-NAV = (
-    ("Start", "/"),
-    ("Check my photos", "/check"),
-    ("Plan a flight", "/plan"),
-    ("Make maps", "/process"),
-    ("Phone", "/phone"),
-)
+NAV = nav_items()  # Start, then the five steps of a flight project in the order they are done
 
 
 def logo(classes: str = "") -> None:
@@ -72,12 +67,18 @@ def frame(title: str) -> Iterator[None]:
             ui.label("Avispria").classes("av-brand-name")
         ui.label(TAGLINE).classes("av-tagline gt-sm")
         ui.space()
+        step = step_for(title)
+        current = nav_label(step) if step is not None else title
         for name, path in NAV:
-            ui.link(name, path).classes("av-nav" + (" av-nav-active" if name == title else ""))
+            ui.link(name, path).classes("av-nav" + (" av-nav-active" if name == current else ""))
         _theme_button(state)
     with ui.column().classes("w-full max-w-5xl mx-auto p-4 gap-4 pb-16"):
         ui.label(title).classes("text-2xl font-bold")
+        if step is not None:
+            journey_bar(step)
         yield
+        if step is not None:
+            next_step_card(step)
     with ui.footer().classes("justify-center text-xs"):
         ui.label(
             f"Avispria {__version__} - early version, not yet flight-tested. "

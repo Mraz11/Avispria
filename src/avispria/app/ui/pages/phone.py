@@ -72,7 +72,7 @@ async def phone_page() -> None:
     rows: list[tuple[PathField, ui.select]] = []
     w: dict[str, Any] = {}  # the widgets of the send panel, which is rebuilt on every check
 
-    with frame("Phone"):
+    with frame("Send to DJI Fly"):
         ui.label(INTRO).classes("text-base")
 
         with ui.card().classes("w-full gap-3"):
